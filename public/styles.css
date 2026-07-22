@@ -48,7 +48,7 @@ label {
 .hero {
   width: min(72rem, calc(100% - 2rem));
   margin: 0 auto;
-  padding: clamp(2rem, 5vw, 4rem) 0 1rem;
+  padding: 0 0 1rem;
   text-align: center;
 }
 
@@ -583,7 +583,7 @@ body.dialog-open {
   width: 90%;
   height: 100%;
   margin: 0 auto;
-  padding: 2vh 0;
+  padding: 0 0 2vh;
   animation: pulse-fade 3.5s ease-in-out forwards;
 }
 
@@ -604,11 +604,11 @@ body.dialog-open {
 }
 
 .splash-photo {
-  flex: 1 1 auto;
-  min-height: 0;
-  height: 100%;
+  /* Zmień poniższą wartość (np. na 50vh, 80vh, 90vh), aby ręcznie dopasować wielkość zdjęcia na ekranie powitalnym */
+  max-height: 70vh;
   width: 100%;
-  margin: 0;
+  object-fit: contain;
+  margin: auto 0;
 }
 
 .splash-date {
