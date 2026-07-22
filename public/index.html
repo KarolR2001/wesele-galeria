@@ -14,15 +14,14 @@
   <body>
     <div id="splash-screen" class="splash-screen">
       <div class="splash-content">
-        <img src="/Imie-pani-mlodej.svg" alt="Panna Młoda" class="splash-element" onerror="this.style.display='none'">
+        <img src="/Imie-pani-mlodej.svg" alt="Panna Młoda" class="splash-element splash-bride" onerror="this.style.display='none'">
         <img src="/zdjecie.svg" alt="Zdjęcie" class="splash-element splash-photo" onerror="this.style.display='none'">
-        <img src="/Imie-pana-mlodego.svg" alt="Pan Młody" class="splash-element" onerror="this.style.display='none'">
+        <img src="/Imie-pana-mlodego.svg" alt="Pan Młody" class="splash-element splash-groom" onerror="this.style.display='none'">
         <img src="/data.svg" alt="Data" class="splash-element splash-date" onerror="this.style.display='none'">
       </div>
     </div>
     <header class="hero">
       <p class="eyebrow">Wspólne wspomnienia</p>
-      <h1>Galeria weselna</h1>
     </header>
 
     <main>
@@ -43,7 +42,6 @@
         <div class="section-heading">
           <div>
             <p class="eyebrow">Zdjęcia i filmy gości</p>
-            <h2 id="gallery-title">Galeria</h2>
           </div>
           <button id="refresh-button" class="text-button" type="button">Odśwież</button>
         </div>
@@ -60,9 +58,13 @@
           <p id="viewer-title" class="viewer-title"></p>
           <button id="viewer-close" class="icon-button" type="button" aria-label="Zamknij podgląd">×</button>
         </header>
-        <div id="viewer-content" class="viewer-content"></div>
+        <div class="viewer-nav-container">
+          <button id="viewer-prev" class="viewer-nav viewer-prev" type="button" aria-label="Poprzedni" hidden>❮</button>
+          <div id="viewer-content" class="viewer-content"></div>
+          <button id="viewer-next" class="viewer-nav viewer-next" type="button" aria-label="Następny" hidden>❯</button>
+        </div>
         <footer class="viewer-actions">
-          <a id="viewer-download" class="primary-button compact" href="#" download>Pobierz plik</a>
+          <a id="viewer-download" class="primary-button compact" href="#" download>Pobierz</a>
           <a id="viewer-drive" class="secondary-button compact" href="#" target="_blank" rel="noopener">Otwórz w Dysku Google</a>
         </footer>
       </div>

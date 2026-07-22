@@ -292,6 +292,7 @@ async function handleMedia(request, url, fileId, env, forceDownload) {
   );
   headers.set("Cache-Control", forceDownload ? "private, no-store" : "public, max-age=3600");
   headers.set("X-Content-Type-Options", "nosniff");
+  headers.set("Accept-Ranges", "bytes");
 
   if (request.method === "HEAD") {
     const contentRange = response.headers.get("Content-Range");

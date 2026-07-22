@@ -32,6 +32,8 @@ const elements = {
   loadMoreButton: document.querySelector("#load-more-button"),
   viewer: document.querySelector("#viewer"),
   viewerTitle: document.querySelector("#viewer-title"),
+  viewerPrev: document.querySelector("#viewer-prev"),
+  viewerNext: document.querySelector("#viewer-next"),
   viewerContent: document.querySelector("#viewer-content"),
   viewerDownload: document.querySelector("#viewer-download"),
   viewerDrive: document.querySelector("#viewer-drive"),
@@ -43,6 +45,8 @@ const state = {
   nextPageToken: null,
   galleryLoading: false,
   wakeLock: null,
+  files: [],
+  currentFileIndex: -1,
 };
 
 elements.fileInput.addEventListener("change", handleFileSelection);
@@ -54,9 +58,22 @@ elements.viewer.addEventListener("cancel", (event) => {
   closeViewer();
 });
 elements.viewer.addEventListener("click", (event) => {
-  if (event.target === elements.viewer) {
+  if (event.target === elements.viewer || event.target.closest(".viewer-shell") === null && event.target.tagName !== 'BUTTON') {
     closeViewer();
   }
+});
+elements.viewerPrev.addEventListener("click", (e) => {
+  e.stopPropagation();
+  navigateViewer(-1);
+});
+elements.viewerNext.addEventListener("click", (e) => {
+  e.stopPropagation();
+  navigateViewer(1);
+});
+document.addEventListener("keydown", (e) => {
+  if (!elements.viewer.open) return;
+  if (e.key === "ArrowLeft") navigateViewer(-1);
+  if (e.key === "ArrowRight") navigateViewer(1);
 });
 window.addEventListener("beforeunload", (event) => {
   if (!state.uploading) {
@@ -203,6 +220,7 @@ async function uploadFile(file, mimeType, row) {
     if (status.complete) {
       localStorage.removeItem(key);
       setRowState(row, 100, "Przesłano", "success");
+      scheduleRowRemoval(row);
       return;
     }
     if (status.expired) {
@@ -248,6 +266,7 @@ async function uploadFile(file, mimeType, row) {
     if (result.complete) {
       localStorage.removeItem(key);
       setRowState(row, 100, "Przesłano", "success");
+      scheduleRowRemoval(row);
       return;
     }
 
@@ -267,6 +286,14 @@ async function uploadFile(file, mimeType, row) {
   }
   localStorage.removeItem(key);
   setRowState(row, 100, "Przesłano", "success");
+  scheduleRowRemoval(row);
+}
+
+function scheduleRowRemoval(row) {
+  setTimeout(() => {
+    row.root.classList.add("fade-out");
+    setTimeout(() => row.root.remove(), 1000);
+  }, 2500);
 }
 
 async function createUploadSession(file, mimeType) {
@@ -582,9 +609,11 @@ async function loadGallery({ reset, quiet = false }) {
 
     if (reset) {
       elements.gallery.replaceChildren();
+      state.files = [];
     }
 
     for (const file of payload.files || []) {
+      state.files.push(file);
       elements.gallery.append(createGalleryCard(file));
     }
 
@@ -665,6 +694,24 @@ function createPlaceholder(kind) {
 }
 
 function openViewer(file) {
+  state.currentFileIndex = state.files.findIndex((f) => f.id === file.id);
+  updateViewerState();
+  document.body.classList.add("dialog-open");
+  elements.viewer.showModal();
+}
+
+function navigateViewer(direction) {
+  const newIndex = state.currentFileIndex + direction;
+  if (newIndex >= 0 && newIndex < state.files.length) {
+    state.currentFileIndex = newIndex;
+    updateViewerState();
+  }
+}
+
+function updateViewerState() {
+  const file = state.files[state.currentFileIndex];
+  if (!file) return;
+
   elements.viewerTitle.textContent = file.name;
   elements.viewerContent.replaceChildren();
 
@@ -696,8 +743,8 @@ function openViewer(file) {
     showDrivePreview(file, driveUrl);
   }
 
-  document.body.classList.add("dialog-open");
-  elements.viewer.showModal();
+  elements.viewerPrev.hidden = state.currentFileIndex <= 0;
+  elements.viewerNext.hidden = state.currentFileIndex >= state.files.length - 1;
 }
 
 function showPreviewFallback(file, driveUrl) {
