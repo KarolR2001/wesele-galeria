@@ -350,10 +350,11 @@ progress::-moz-progress-bar {
 }
 
 .viewer {
-  width: min(70rem, calc(100% - 1rem));
-  max-width: none;
-  height: min(92dvh, 58rem);
-  max-height: none;
+  width: 95vw;
+  max-width: 70rem;
+  height: 95dvh;
+  max-height: 58rem;
+  margin: auto;
   padding: 0;
   border: 0;
   border-radius: 1.3rem;
@@ -368,13 +369,14 @@ progress::-moz-progress-bar {
 }
 
 .viewer-shell {
-  display: grid;
-  grid-template-rows: auto minmax(0, 1fr) auto;
+  display: flex;
+  flex-direction: column;
   height: 100%;
 }
 
 .viewer-header,
 .viewer-actions {
+  flex-shrink: 0;
   display: flex;
   align-items: center;
   gap: 0.75rem;
@@ -391,6 +393,12 @@ progress::-moz-progress-bar {
   flex-wrap: wrap;
   justify-content: center;
   border-top: 1px solid var(--line);
+}
+
+#viewer-drive {
+  font-size: 0.85rem;
+  padding: 0.4rem 0.85rem;
+  min-height: 2.2rem;
 }
 
 .viewer-title {
@@ -416,9 +424,11 @@ progress::-moz-progress-bar {
 }
 
 .viewer-nav-container {
+  flex: 1;
   position: relative;
   display: flex;
   min-height: 0;
+  width: 100%;
   align-items: center;
   background: #313131;
 }
@@ -461,6 +471,7 @@ progress::-moz-progress-bar {
   display: grid;
   min-height: 0;
   height: 100%;
+  width: 100%;
   overflow: hidden;
   place-items: center;
 }
@@ -573,11 +584,12 @@ body.dialog-open {
   max-width: 100%;
   max-height: 14vh;
   object-fit: contain;
+  flex-shrink: 0;
 }
 
 .splash-bride {
-  max-height: 18vh;
-  transform: scale(1.2);
+  max-height: 16vh;
+  transform: scale(1.15);
 }
 
 .splash-groom {
@@ -585,14 +597,15 @@ body.dialog-open {
 }
 
 .splash-photo {
-  max-height: 85vh;
+  max-height: 55vh;
+  flex: 1 1 auto;
+  min-height: 0;
   height: 100%;
   width: 100%;
-  margin-top: -6vh;
+  margin: 1vh 0;
 }
 
 .splash-date {
-  margin-top: -3vh;
   max-height: 10vh;
 }
 
