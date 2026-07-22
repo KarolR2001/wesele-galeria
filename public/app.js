@@ -79,6 +79,16 @@ document.addEventListener("visibilitychange", async () => {
   }
 });
 
+window.addEventListener("load", () => {
+  setTimeout(() => {
+    const splash = document.getElementById("splash-screen");
+    if (splash) {
+      splash.classList.add("fade-out");
+      setTimeout(() => splash.remove(), 800);
+    }
+  }, 2800);
+});
+
 loadGallery({ reset: true });
 
 async function handleFileSelection() {
