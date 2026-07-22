@@ -677,7 +677,7 @@ function createGalleryCard(file) {
   if (file.kind === "video") {
     const badge = document.createElement("span");
     badge.className = "video-badge";
-    badge.textContent = "▶";
+    badge.innerHTML = `<svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>`;
     badge.setAttribute("aria-hidden", "true");
     button.append(badge);
   }
@@ -688,7 +688,7 @@ function createGalleryCard(file) {
 function createPlaceholder(kind) {
   const placeholder = document.createElement("span");
   placeholder.className = "gallery-placeholder";
-  placeholder.textContent = kind === "video" ? "▶" : "▧";
+  placeholder.innerHTML = kind === "video" ? `<svg width="40" height="40" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>` : "▧";
   placeholder.setAttribute("aria-hidden", "true");
   return placeholder;
 }
@@ -715,6 +715,10 @@ function updateViewerState() {
   elements.viewerTitle.textContent = file.name;
   elements.viewerContent.replaceChildren();
 
+  const loader = document.createElement("div");
+  loader.className = "viewer-loader";
+  elements.viewerContent.append(loader);
+
   const resourceKey = file.resourceKey ? `&resourceKey=${encodeURIComponent(file.resourceKey)}` : "";
   const name = encodeURIComponent(file.name);
   const mediaUrl = `${API}/media/${encodeURIComponent(file.id)}?name=${name}${resourceKey}`;
@@ -729,7 +733,11 @@ function updateViewerState() {
     const image = document.createElement("img");
     image.src = mediaUrl;
     image.alt = file.name;
-    image.addEventListener("error", () => showPreviewFallback(file, driveUrl));
+    image.addEventListener("load", () => loader.remove());
+    image.addEventListener("error", () => {
+      loader.remove();
+      showPreviewFallback(file, driveUrl);
+    });
     elements.viewerContent.append(image);
   } else if (file.kind === "video") {
     const video = document.createElement("video");
@@ -737,9 +745,14 @@ function updateViewerState() {
     video.controls = true;
     video.playsInline = true;
     video.preload = "metadata";
-    video.addEventListener("error", () => showDrivePreview(file, driveUrl));
+    video.addEventListener("loadeddata", () => loader.remove());
+    video.addEventListener("error", () => {
+      loader.remove();
+      showDrivePreview(file, driveUrl);
+    });
     elements.viewerContent.append(video);
   } else {
+    loader.remove();
     showDrivePreview(file, driveUrl);
   }
 

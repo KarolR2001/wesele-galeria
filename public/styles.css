@@ -498,6 +498,24 @@ progress::-moz-progress-bar {
   object-fit: contain;
 }
 
+.viewer-loader {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 3.5rem;
+  height: 3.5rem;
+  border: 4px solid rgba(255, 255, 255, 0.432);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: viewer-spin 1s linear infinite;
+  z-index: 5;
+}
+
+@keyframes viewer-spin {
+  to { transform: translate(-50%, -50%) rotate(360deg); }
+}
+
 .viewer-note {
   max-width: 34rem;
   margin: 1rem;
