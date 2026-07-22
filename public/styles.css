@@ -396,9 +396,9 @@ progress::-moz-progress-bar {
 }
 
 #viewer-drive {
-  font-size: 0.85rem;
-  padding: 0.4rem 0.85rem;
-  min-height: 2.2rem;
+  font-size: 0.7rem;
+  padding: 0.25rem 0.6rem;
+  min-height: 1.8rem;
 }
 
 .viewer-title {
@@ -597,12 +597,11 @@ body.dialog-open {
 }
 
 .splash-photo {
-  max-height: 55vh;
   flex: 1 1 auto;
   min-height: 0;
   height: 100%;
   width: 100%;
-  margin: 1vh 0;
+  margin: 0;
 }
 
 .splash-date {
