@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="pl">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <meta name="robots" content="noindex, nofollow, noarchive">
+    <meta name="theme-color" content="#f7f2ed">
+    <title>Galeria weselna</title>
+    <link rel="stylesheet" href="/styles.css">
+  </head>
+  <body>
+    <header class="hero">
+      <p class="eyebrow">Wspólne wspomnienia</p>
+      <h1>Galeria weselna</h1>
+      <p>Dodaj zdjęcia i filmy z telefonu. Konto Google nie jest potrzebne.</p>
+    </header>
+
+    <main>
+      <section class="panel upload-panel" aria-labelledby="upload-title">
+        <div>
+          <h2 id="upload-title">Dodaj zdjęcia i filmy</h2>
+          <p class="muted">Podczas wysyłania pozostaw tę stronę otwartą. Pliki są przesyłane pojedynczo, aby działało to stabilnie także przez Internet mobilny.</p>
+        </div>
+
+        <label class="primary-button" for="file-input">Wybierz pliki</label>
+        <input id="file-input" type="file" accept="image/*,video/*" multiple hidden>
+
+        <p id="upload-summary" class="status" role="status" aria-live="polite"></p>
+        <div id="upload-queue" class="upload-queue" aria-live="polite"></div>
+      </section>
+
+      <section class="gallery-section" aria-labelledby="gallery-title">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">Zdjęcia i filmy gości</p>
+            <h2 id="gallery-title">Galeria</h2>
+          </div>
+          <button id="refresh-button" class="text-button" type="button">Odśwież</button>
+        </div>
+
+        <p id="gallery-status" class="status" role="status" aria-live="polite">Ładowanie galerii…</p>
+        <div id="gallery" class="gallery" aria-live="polite"></div>
+        <button id="load-more-button" class="secondary-button" type="button" hidden>Pokaż więcej</button>
+      </section>
+    </main>
+
+    <dialog id="viewer" class="viewer">
+      <div class="viewer-shell">
+        <header class="viewer-header">
+          <p id="viewer-title" class="viewer-title"></p>
+          <button id="viewer-close" class="icon-button" type="button" aria-label="Zamknij podgląd">×</button>
+        </header>
+        <div id="viewer-content" class="viewer-content"></div>
+        <footer class="viewer-actions">
+          <a id="viewer-download" class="primary-button compact" href="#" download>Pobierz plik</a>
+          <a id="viewer-drive" class="secondary-button compact" href="#" target="_blank" rel="noopener">Otwórz podgląd Google</a>
+        </footer>
+      </div>
+    </dialog>
+
+    <noscript>Ta strona wymaga włączonej obsługi JavaScript.</noscript>
+    <script type="module" src="/app.js"></script>
+  </body>
+</html>
