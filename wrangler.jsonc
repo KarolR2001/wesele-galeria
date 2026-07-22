@@ -3,6 +3,7 @@
   "name": "wesele-galeria",
   "main": "src/worker.js",
   "compatibility_date": "2026-07-21",
+  "workers_dev": true,
   "assets": {
     "directory": "./public"
   }
