@@ -24,8 +24,9 @@ html {
 }
 
 body {
-  min-height: 100%;
+  min-height: 100dvh;
   margin: 0;
+  padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
   color: var(--text);
   background:
     radial-gradient(circle at top left, rgba(255, 255, 255, 0.98), transparent 34rem),
@@ -47,7 +48,7 @@ label {
 .hero {
   width: min(72rem, calc(100% - 2rem));
   margin: 0 auto;
-  padding: clamp(3.5rem, 9vw, 7rem) 0 1rem;
+  padding: clamp(2rem, 5vw, 4rem) 0 1rem;
   text-align: center;
 }
 
@@ -548,6 +549,7 @@ body.dialog-open {
   display: flex;
   align-items: center;
   justify-content: center;
+  padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
   transition: opacity 0.8s ease-out, visibility 0.8s;
 }
 
@@ -562,8 +564,8 @@ body.dialog-open {
   align-items: center;
   justify-content: space-between;
   width: 90%;
-  height: 95dvh;
-  padding: 4vh 0;
+  height: 100%;
+  padding: 2vh 0;
   animation: pulse-fade 3.5s ease-in-out forwards;
 }
 
