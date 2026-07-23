@@ -100,10 +100,14 @@ window.addEventListener("load", () => {
   setTimeout(() => {
     const splash = document.getElementById("splash-screen");
     if (splash) {
+      splash.addEventListener("animationend", (e) => {
+        if (e.animationName === "splash-disappear") {
+          splash.remove();
+        }
+      });
       splash.classList.add("fade-out");
-      setTimeout(() => splash.remove(), 800);
     }
-  }, 2800);
+  }, 3500);
 });
 
 loadGallery({ reset: true });
