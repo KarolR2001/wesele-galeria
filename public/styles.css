@@ -910,8 +910,9 @@ body.dialog-open {
     text-align: center;
   }
 
-  .hero > .eyebrow {
+  .hero > p.eyebrow:last-child {
     width: 100vw;
+    max-width: none;
     margin-left: calc((100% - 100vw) / 2);
     text-align: center !important;
   }
