@@ -907,6 +907,12 @@ body.dialog-open {
 
   .hero {
     padding-bottom: clamp(1rem, 1.5vw, 1.75rem);
+    text-align: center;
+  }
+
+  .hero > .eyebrow {
+    width: 100%;
+    text-align: center;
   }
 
   main {
