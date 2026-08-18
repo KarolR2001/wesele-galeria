@@ -114,7 +114,7 @@ Zapewnić gościom weselnym najkrótszą możliwą ścieżkę:
 - odtwarzanie filmu,
 - zapasowy podgląd Google dla formatów, których przeglądarka nie obsługuje,
 - pobieranie pojedynczego pliku,
-- stronicowanie po 100 elementów przyciskiem „Pokaż więcej”,
+- automatyczne pobieranie wszystkich elementów galerii stronami po 100 rekordów,
 - ręczne odświeżenie galerii,
 - kod QR,
 - lokalne i produkcyjne testy smoke.
@@ -140,7 +140,7 @@ Wszystkie funkcje wymienione w punkcie 2.3 oraz moderacja treści. Link jest św
 ### 5.2. Gość przegląda
 
 1. Otwiera stronę.
-2. Widzi maksymalnie 100 najnowszych materiałów.
+2. Widzi wszystkie dostępne materiały, pobierane automatycznie stronami po 100 rekordów.
 3. Naciska kafelek.
 4. Zdjęcie otwiera się w oknie pełnoekranowym; film dostaje natywny odtwarzacz.
 5. Przy problemie z kodekiem dostępny jest podgląd Google.
@@ -240,7 +240,7 @@ Zakres `drive.file` ogranicza szkody: token aplikacji nie powinien zapewniać do
 | FR-06 | Sesja uploadu jest zapisywana w `localStorage` na maksymalnie 6 dni. |
 | FR-07 | Ponowne wybranie tego samego pliku sprawdza stan sesji i wznawia upload. |
 | FR-08 | Galeria pobiera metadane z Drive i pokazuje miniatury. |
-| FR-09 | Galeria pokazuje maksymalnie 100 elementów na stronę i prosty przycisk „Pokaż więcej”. |
+| FR-09 | Galeria automatycznie pobiera wszystkie elementy, korzystając ze stronicowania API po 100 rekordów. |
 | FR-10 | Zdjęcie otwiera się w podglądzie. |
 | FR-11 | Film ma natywny odtwarzacz i obsługę przewijania. |
 | FR-12 | HEIC/HEVC i nieobsługiwane media mają zapasowy podgląd Google. |

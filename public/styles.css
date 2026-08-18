@@ -355,10 +355,6 @@ progress::-moz-progress-bar {
   text-align: center;
 }
 
-#load-more-button {
-  margin: 1.25rem auto 0;
-}
-
 .viewer {
   width: 95vw;
   max-width: 70rem;

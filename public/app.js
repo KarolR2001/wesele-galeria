@@ -29,7 +29,6 @@ const elements = {
   gallery: document.querySelector("#gallery"),
   galleryStatus: document.querySelector("#gallery-status"),
   refreshButton: document.querySelector("#refresh-button"),
-  loadMoreButton: document.querySelector("#load-more-button"),
   viewer: document.querySelector("#viewer"),
   viewerTitle: document.querySelector("#viewer-title"),
   viewerPrev: document.querySelector("#viewer-prev"),
@@ -42,7 +41,6 @@ const elements = {
 
 const state = {
   uploading: false,
-  nextPageToken: null,
   galleryLoading: false,
   wakeLock: null,
   files: [],
@@ -50,8 +48,7 @@ const state = {
 };
 
 elements.fileInput.addEventListener("change", handleFileSelection);
-elements.refreshButton.addEventListener("click", () => loadGallery({ reset: true }));
-elements.loadMoreButton.addEventListener("click", () => loadGallery({ reset: false }));
+elements.refreshButton.addEventListener("click", () => loadGallery());
 elements.viewerClose.addEventListener("click", closeViewer);
 elements.viewer.addEventListener("cancel", (event) => {
   event.preventDefault();
@@ -110,7 +107,7 @@ window.addEventListener("load", () => {
   }, 3500);
 });
 
-loadGallery({ reset: true });
+loadGallery();
 
 async function handleFileSelection() {
   const files = Array.from(elements.fileInput.files || []);
@@ -170,8 +167,8 @@ async function handleFileSelection() {
 
   if (successCount > 0) {
     await sleep(1200);
-    await loadGallery({ reset: true });
-    window.setTimeout(() => loadGallery({ reset: true, quiet: true }), 7000);
+    await loadGallery();
+    window.setTimeout(() => loadGallery({ quiet: true }), 7000);
   }
 }
 
@@ -582,47 +579,51 @@ function setRowState(row, progress, message, kind = "") {
   row.message.className = `upload-message${kind ? ` ${kind}` : ""}`;
 }
 
-async function loadGallery({ reset, quiet = false }) {
+async function loadGallery({ quiet = false } = {}) {
   if (state.galleryLoading) {
     return;
   }
   state.galleryLoading = true;
   elements.refreshButton.disabled = true;
-  elements.loadMoreButton.disabled = true;
 
-  if (reset) {
-    state.nextPageToken = null;
-    if (!quiet) {
-      elements.galleryStatus.textContent = "Ładowanie galerii…";
-    }
-  } else {
-    elements.galleryStatus.textContent = "Ładowanie kolejnych plików…";
+  if (!quiet) {
+    elements.galleryStatus.textContent = "Ładowanie galerii…";
   }
 
   try {
-    const params = new URLSearchParams({ pageSize: "100" });
-    if (!reset && state.nextPageToken) {
-      params.set("pageToken", state.nextPageToken);
-    }
+    let pageToken = null;
+    let pageNumber = 0;
 
-    const response = await fetch(`${API}/files?${params}`, { cache: "no-store" });
-    const payload = await parseJson(response);
-    if (!response.ok) {
-      throw new Error(payload.error || "Nie udało się pobrać galerii.");
-    }
+    do {
+      const params = new URLSearchParams({ pageSize: "100" });
+      if (pageToken) {
+        params.set("pageToken", pageToken);
+      }
 
-    if (reset) {
-      elements.gallery.replaceChildren();
-      state.files = [];
-    }
+      const response = await fetch(`${API}/files?${params}`, { cache: "no-store" });
+      const payload = await parseJson(response);
+      if (!response.ok) {
+        throw new Error(payload.error || "Nie udało się pobrać galerii.");
+      }
 
-    for (const file of payload.files || []) {
-      state.files.push(file);
-      elements.gallery.append(createGalleryCard(file));
-    }
+      if (pageNumber === 0) {
+        elements.gallery.replaceChildren();
+        state.files = [];
+      }
 
-    state.nextPageToken = payload.nextPageToken || null;
-    elements.loadMoreButton.hidden = !state.nextPageToken;
+      for (const file of payload.files || []) {
+        state.files.push(file);
+        elements.gallery.append(createGalleryCard(file));
+      }
+
+      pageToken = payload.nextPageToken || null;
+      pageNumber += 1;
+
+      if (pageToken && !quiet) {
+        const loaded = elements.gallery.childElementCount;
+        elements.galleryStatus.textContent = `Załadowano ${loaded} ${itemWord(loaded)}. Ładowanie kolejnych plików…`;
+      }
+    } while (pageToken);
 
     const total = elements.gallery.childElementCount;
     if (total === 0) {
@@ -637,7 +638,7 @@ async function loadGallery({ reset, quiet = false }) {
   } catch (error) {
     console.error("Gallery load failed", error);
     elements.galleryStatus.textContent = "Nie udało się załadować galerii. Naciśnij „Odśwież”.";
-    if (reset && elements.gallery.childElementCount === 0) {
+    if (elements.gallery.childElementCount === 0) {
       const empty = document.createElement("div");
       empty.className = "empty-state";
       empty.textContent = readableError(error);
@@ -646,7 +647,6 @@ async function loadGallery({ reset, quiet = false }) {
   } finally {
     state.galleryLoading = false;
     elements.refreshButton.disabled = false;
-    elements.loadMoreButton.disabled = false;
   }
 }
 
