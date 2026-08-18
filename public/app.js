@@ -28,6 +28,9 @@ const elements = {
   uploadQueue: document.querySelector("#upload-queue"),
   gallery: document.querySelector("#gallery"),
   galleryStatus: document.querySelector("#gallery-status"),
+  selectionSummary: document.querySelector("#selection-summary"),
+  downloadSelectedButton: document.querySelector("#download-selected-button"),
+  clearSelectionButton: document.querySelector("#clear-selection-button"),
   refreshButton: document.querySelector("#refresh-button"),
   viewer: document.querySelector("#viewer"),
   viewerTitle: document.querySelector("#viewer-title"),
@@ -45,10 +48,14 @@ const state = {
   wakeLock: null,
   files: [],
   currentFileIndex: -1,
+  selectedFileIds: new Set(),
+  downloadingSelected: false,
 };
 
 elements.fileInput.addEventListener("change", handleFileSelection);
 elements.refreshButton.addEventListener("click", () => loadGallery());
+elements.downloadSelectedButton.addEventListener("click", downloadSelectedFiles);
+elements.clearSelectionButton.addEventListener("click", clearSelection);
 elements.viewerClose.addEventListener("click", closeViewer);
 elements.viewer.addEventListener("cancel", (event) => {
   event.preventDefault();
@@ -625,6 +632,8 @@ async function loadGallery({ quiet = false } = {}) {
       }
     } while (pageToken);
 
+    reconcileSelection();
+
     const total = elements.gallery.childElementCount;
     if (total === 0) {
       const empty = document.createElement("div");
@@ -651,11 +660,15 @@ async function loadGallery({ quiet = false } = {}) {
 }
 
 function createGalleryCard(file) {
-  const button = document.createElement("button");
-  button.className = "gallery-card";
-  button.type = "button";
-  button.setAttribute("aria-label", `${file.kind === "video" ? "Odtwórz film" : "Otwórz zdjęcie"}: ${file.name}`);
-  button.addEventListener("click", () => openViewer(file));
+  const card = document.createElement("article");
+  card.className = "gallery-card";
+  card.classList.toggle("is-selected", state.selectedFileIds.has(file.id));
+
+  const mediaButton = document.createElement("button");
+  mediaButton.className = "gallery-card-media";
+  mediaButton.type = "button";
+  mediaButton.setAttribute("aria-label", `${file.kind === "video" ? "Odtwórz film" : "Otwórz zdjęcie"}: ${file.name}`);
+  mediaButton.addEventListener("click", () => openViewer(file));
 
   if (file.thumbnailLink) {
     const image = document.createElement("img");
@@ -673,9 +686,9 @@ function createGalleryCard(file) {
         image.replaceWith(createPlaceholder(file.kind));
       }
     });
-    button.append(image);
+    mediaButton.append(image);
   } else {
-    button.append(createPlaceholder(file.kind));
+    mediaButton.append(createPlaceholder(file.kind));
   }
 
   if (file.kind === "video") {
@@ -683,10 +696,99 @@ function createGalleryCard(file) {
     badge.className = "video-badge";
     badge.innerHTML = `<svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>`;
     badge.setAttribute("aria-hidden", "true");
-    button.append(badge);
+    mediaButton.append(badge);
   }
 
-  return button;
+  const selectionLabel = document.createElement("label");
+  selectionLabel.className = "gallery-selection";
+  selectionLabel.title = `Zaznacz: ${file.name}`;
+
+  const checkbox = document.createElement("input");
+  checkbox.className = "gallery-selection-input";
+  checkbox.type = "checkbox";
+  checkbox.checked = state.selectedFileIds.has(file.id);
+  checkbox.setAttribute("aria-label", `Zaznacz ${file.kind === "video" ? "film" : "zdjęcie"}: ${file.name}`);
+  checkbox.addEventListener("change", () => setFileSelected(file.id, checkbox.checked, card));
+
+  selectionLabel.append(checkbox);
+  card.append(mediaButton, selectionLabel);
+  return card;
+}
+
+function setFileSelected(fileId, selected, card) {
+  if (selected) {
+    state.selectedFileIds.add(fileId);
+  } else {
+    state.selectedFileIds.delete(fileId);
+  }
+  card.classList.toggle("is-selected", selected);
+  updateSelectionUI();
+}
+
+function reconcileSelection() {
+  const availableIds = new Set(state.files.map((file) => file.id));
+  for (const fileId of state.selectedFileIds) {
+    if (!availableIds.has(fileId)) {
+      state.selectedFileIds.delete(fileId);
+    }
+  }
+  updateSelectionUI();
+}
+
+function updateSelectionUI() {
+  const count = state.selectedFileIds.size;
+  elements.downloadSelectedButton.hidden = count === 0;
+  elements.clearSelectionButton.hidden = count === 0;
+  elements.downloadSelectedButton.disabled = state.downloadingSelected;
+  elements.clearSelectionButton.disabled = state.downloadingSelected;
+  elements.selectionSummary.textContent = count > 0
+    ? `Zaznaczono ${count} ${itemWord(count)}.`
+    : "";
+}
+
+function clearSelection() {
+  state.selectedFileIds.clear();
+  elements.gallery.querySelectorAll(".gallery-card").forEach((card) => {
+    card.classList.remove("is-selected");
+    const checkbox = card.querySelector(".gallery-selection-input");
+    if (checkbox) {
+      checkbox.checked = false;
+    }
+  });
+  updateSelectionUI();
+}
+
+function downloadSelectedFiles() {
+  if (state.downloadingSelected) {
+    return;
+  }
+
+  const selectedFiles = state.files.filter((file) => state.selectedFileIds.has(file.id));
+  if (selectedFiles.length === 0) {
+    updateSelectionUI();
+    return;
+  }
+
+  state.downloadingSelected = true;
+  updateSelectionUI();
+  elements.selectionSummary.textContent = `Uruchamianie pobierania ${selectedFiles.length} ${fileWord(selectedFiles.length)}…`;
+
+  for (const file of selectedFiles) {
+    const resourceKey = file.resourceKey ? `&resourceKey=${encodeURIComponent(file.resourceKey)}` : "";
+    const name = encodeURIComponent(file.name);
+    const link = document.createElement("a");
+    link.href = `${API}/download/${encodeURIComponent(file.id)}?name=${name}${resourceKey}`;
+    link.download = file.name;
+    link.rel = "noopener";
+    link.hidden = true;
+    document.body.append(link);
+    link.click();
+    link.remove();
+  }
+
+  state.downloadingSelected = false;
+  updateSelectionUI();
+  elements.selectionSummary.textContent = `Uruchomiono pobieranie ${selectedFiles.length} ${fileWord(selectedFiles.length)}. Jeśli przeglądarka zapyta, zezwól na wiele pobrań.`;
 }
 
 function createPlaceholder(kind) {
