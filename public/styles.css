@@ -292,6 +292,58 @@ progress::-moz-progress-bar {
   gap: 0.5rem 0.85rem;
 }
 
+.selection-toolbar {
+  position: fixed;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.65rem 1rem;
+  padding: 0.45rem max(0.75rem, env(safe-area-inset-right)) calc(0.45rem + env(safe-area-inset-bottom)) max(0.75rem, env(safe-area-inset-left));
+  border-top: 1px solid rgba(229, 210, 222, 0.92);
+  background: rgba(255, 255, 255, 0.94);
+  box-shadow: 0 -8px 24px rgba(49, 49, 49, 0.08);
+  backdrop-filter: blur(12px);
+}
+
+body.selection-mode main {
+  padding-bottom: calc(7rem + env(safe-area-inset-bottom));
+}
+
+.selection-toolbar .selection-summary {
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  margin: 0;
+  font-size: 0.72rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.selection-toolbar-actions {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.selection-toolbar .primary-button.compact,
+.selection-toolbar .text-button {
+  min-height: 2rem;
+  padding: 0.35rem 0.7rem;
+  border-radius: 0.55rem;
+  font-size: 0.68rem;
+  white-space: nowrap;
+}
+
+.selection-toolbar button:disabled {
+  cursor: default;
+  opacity: 0.45;
+}
+
 .text-button {
   padding: 0.7rem 0;
   color: var(--accent);
@@ -357,21 +409,63 @@ progress::-moz-progress-bar {
   left: 0.55rem;
   z-index: 2;
   display: grid;
-  min-width: 2.75rem;
-  min-height: 2.75rem;
+  width: 2rem;
+  height: 2rem;
   place-items: center;
-  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.9);
+  border-radius: 0.55rem;
   cursor: pointer;
-  background: rgba(49, 49, 49, 0.68);
-  backdrop-filter: blur(8px);
+  background: rgba(255, 255, 255, 0.88);
+  box-shadow: 0 3px 12px rgba(49, 49, 49, 0.16);
+  opacity: 0;
+  pointer-events: none;
+  transform: scale(0.88);
+  visibility: hidden;
+  transition: opacity 120ms ease, transform 120ms ease, visibility 120ms ease;
+}
+
+.gallery.selection-mode .gallery-selection {
+  opacity: 1;
+  pointer-events: auto;
+  transform: scale(1);
+  visibility: visible;
 }
 
 .gallery-selection-input {
-  width: 1.35rem;
-  height: 1.35rem;
+  appearance: none;
+  display: grid;
+  width: 1.05rem;
+  height: 1.05rem;
   margin: 0;
-  accent-color: var(--accent);
+  place-content: center;
+  border: 1px solid rgba(49, 49, 49, 0.38);
+  border-radius: 0.28rem;
+  background: transparent;
   cursor: pointer;
+}
+
+.gallery-selection-input::after {
+  width: 0.28rem;
+  height: 0.54rem;
+  border: solid #fff;
+  border-width: 0 2px 2px 0;
+  content: "";
+  transform: rotate(45deg) scale(0);
+  transition: transform 100ms ease;
+}
+
+.gallery-selection-input:checked {
+  border-color: var(--accent);
+  background: var(--accent);
+}
+
+.gallery-selection-input:checked::after {
+  transform: rotate(45deg) scale(1);
+}
+
+.gallery-selection-input:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 
 .gallery-placeholder {
@@ -615,6 +709,17 @@ body.dialog-open {
 }
 
 @media (max-width: 40rem) {
+  .selection-toolbar {
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 0.25rem 0.5rem;
+  }
+
+  .selection-toolbar .selection-summary {
+    flex: 1 1 100%;
+    text-align: center;
+  }
+
   .gallery-actions {
     gap: 0.35rem 0.6rem;
   }

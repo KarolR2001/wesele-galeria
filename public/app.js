@@ -62,6 +62,8 @@ const elements = {
   uploadQueue: document.querySelector("#upload-queue"),
   gallery: document.querySelector("#gallery"),
   galleryStatus: document.querySelector("#gallery-status"),
+  selectionModeButton: document.querySelector("#selection-mode-button"),
+  selectionToolbar: document.querySelector("#selection-toolbar"),
   selectionSummary: document.querySelector("#selection-summary"),
   downloadSelectedButton: document.querySelector("#download-selected-button"),
   clearSelectionButton: document.querySelector("#clear-selection-button"),
@@ -82,12 +84,14 @@ const state = {
   wakeLock: null,
   files: [],
   currentFileIndex: -1,
+  selectionMode: false,
   selectedFileIds: new Set(),
   downloadingSelected: false,
 };
 
 elements.fileInput?.addEventListener("change", handleFileSelection);
 elements.refreshButton?.addEventListener("click", () => loadGallery());
+elements.selectionModeButton?.addEventListener("click", toggleSelectionMode);
 elements.downloadSelectedButton?.addEventListener("click", downloadSelectedFiles);
 elements.clearSelectionButton?.addEventListener("click", clearSelection);
 elements.viewerClose?.addEventListener("click", closeViewer);
@@ -682,13 +686,20 @@ async function loadGallery({ quiet = false } = {}) {
 function createGalleryCard(file) {
   const card = document.createElement("article");
   card.className = "gallery-card";
+  card.dataset.fileId = file.id;
   card.classList.toggle("is-selected", state.selectedFileIds.has(file.id));
 
   const mediaButton = document.createElement("button");
   mediaButton.className = "gallery-card-media";
   mediaButton.type = "button";
-  mediaButton.setAttribute("aria-label", `${file.kind === "video" ? "Odtwórz film" : "Otwórz zdjęcie"}: ${file.name}`);
-  mediaButton.addEventListener("click", () => openViewer(file));
+  mediaButton.setAttribute("aria-label", galleryMediaLabel(file));
+  mediaButton.addEventListener("click", () => {
+    if (state.selectionMode) {
+      setFileSelected(file.id, !state.selectedFileIds.has(file.id), card);
+      return;
+    }
+    openViewer(file);
+  });
 
   if (file.thumbnailLink) {
     const image = document.createElement("img");
@@ -735,6 +746,42 @@ function createGalleryCard(file) {
   return card;
 }
 
+function galleryMediaLabel(file) {
+  return state.selectionMode
+    ? `Zaznacz ${file.kind === "video" ? "film" : "zdjęcie"}: ${file.name}`
+    : `${file.kind === "video" ? "Odtwórz film" : "Otwórz zdjęcie"}: ${file.name}`;
+}
+
+function toggleSelectionMode() {
+  setSelectionMode(!state.selectionMode);
+}
+
+function setSelectionMode(enabled) {
+  state.selectionMode = enabled;
+  document.body.classList.toggle("selection-mode", enabled);
+  elements.gallery?.classList.toggle("selection-mode", enabled);
+
+  if (elements.selectionModeButton) {
+    elements.selectionModeButton.textContent = enabled ? "Zakończ" : "Zaznacz";
+    elements.selectionModeButton.setAttribute("aria-pressed", String(enabled));
+  }
+
+  elements.gallery?.querySelectorAll(".gallery-card").forEach((card) => {
+    const file = state.files.find((entry) => entry.id === card.dataset.fileId);
+    const mediaButton = card.querySelector(".gallery-card-media");
+    const checkbox = card.querySelector(".gallery-selection-input");
+    card.classList.toggle("is-selected", enabled && state.selectedFileIds.has(card.dataset.fileId));
+    if (checkbox) {
+      checkbox.checked = enabled && state.selectedFileIds.has(card.dataset.fileId);
+    }
+    if (file && mediaButton) {
+      mediaButton.setAttribute("aria-label", galleryMediaLabel(file));
+    }
+  });
+
+  updateSelectionUI();
+}
+
 function setFileSelected(fileId, selected, card) {
   if (selected) {
     state.selectedFileIds.add(fileId);
@@ -756,15 +803,16 @@ function reconcileSelection() {
 }
 
 function updateSelectionUI() {
-  if (!elements.downloadSelectedButton || !elements.clearSelectionButton || !elements.selectionSummary) {
+  if (!elements.selectionToolbar || !elements.downloadSelectedButton || !elements.clearSelectionButton || !elements.selectionSummary) {
     return;
   }
 
   const count = state.selectedFileIds.size;
-  elements.downloadSelectedButton.hidden = count === 0;
-  elements.clearSelectionButton.hidden = count === 0;
-  elements.downloadSelectedButton.disabled = state.downloadingSelected;
-  elements.clearSelectionButton.disabled = state.downloadingSelected;
+  elements.selectionToolbar.hidden = !state.selectionMode;
+  elements.downloadSelectedButton.hidden = !state.selectionMode;
+  elements.clearSelectionButton.hidden = !state.selectionMode;
+  elements.downloadSelectedButton.disabled = count === 0 || state.downloadingSelected;
+  elements.clearSelectionButton.disabled = count === 0 || state.downloadingSelected;
   elements.selectionSummary.textContent = count > 0
     ? `Zaznaczono ${count} ${itemWord(count)}.`
     : "";

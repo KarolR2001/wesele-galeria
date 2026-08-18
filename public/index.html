@@ -59,17 +59,23 @@
             <p id="gallery-title" class="eyebrow">Zdjęcia i filmy gości</p>
           </div>
           <div class="gallery-actions">
-            <button id="download-selected-button" class="primary-button compact" type="button" hidden>Pobierz zaznaczone</button>
-            <button id="clear-selection-button" class="text-button" type="button" hidden>Wyczyść zaznaczenie</button>
+            <button id="selection-mode-button" class="text-button" type="button" aria-pressed="false">Zaznacz</button>
             <button id="refresh-button" class="text-button" type="button">Odśwież</button>
           </div>
         </div>
 
         <p id="gallery-status" class="status" role="status" aria-live="polite">Ładowanie galerii…</p>
-        <p id="selection-summary" class="status selection-summary" role="status" aria-live="polite"></p>
         <div id="gallery" class="gallery" aria-live="polite"></div>
       </section>
     </main>
+
+    <footer id="selection-toolbar" class="selection-toolbar" aria-label="Zaznaczone pliki" hidden>
+      <p id="selection-summary" class="status selection-summary" role="status" aria-live="polite"></p>
+      <div class="selection-toolbar-actions">
+        <button id="download-selected-button" class="primary-button compact" type="button" hidden>Pobierz zaznaczone</button>
+        <button id="clear-selection-button" class="text-button" type="button" hidden>Wyczyść zaznaczenie</button>
+      </div>
+    </footer>
 
     <dialog id="viewer" class="viewer">
       <div class="viewer-shell">
