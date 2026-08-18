@@ -883,22 +883,39 @@ function downloadSelectedFiles() {
   updateSelectionUI();
   elements.selectionSummary.textContent = `Uruchamianie pobierania ${selectedFiles.length} ${fileWord(selectedFiles.length)}…`;
 
-  for (const file of selectedFiles) {
-    const resourceKey = file.resourceKey ? `&resourceKey=${encodeURIComponent(file.resourceKey)}` : "";
-    const name = encodeURIComponent(file.name);
-    const link = document.createElement("a");
-    link.href = `${API}/download/${encodeURIComponent(file.id)}?name=${name}${resourceKey}`;
-    link.download = file.name;
-    link.rel = "noopener";
-    link.hidden = true;
-    document.body.append(link);
-    link.click();
-    link.remove();
-  }
+  const frameName = `download-archive-${Date.now()}`;
+  const frame = document.createElement("iframe");
+  frame.name = frameName;
+  frame.hidden = true;
+  frame.setAttribute("aria-hidden", "true");
+
+  const form = document.createElement("form");
+  form.method = "post";
+  form.action = `${API}/download-archive`;
+  form.target = frameName;
+  form.hidden = true;
+
+  const filesInput = document.createElement("input");
+  filesInput.type = "hidden";
+  filesInput.name = "files";
+  filesInput.value = JSON.stringify(selectedFiles.map((file) => ({
+    id: file.id,
+    name: file.name,
+    size: file.size,
+    resourceKey: file.resourceKey || "",
+  })));
+
+  form.append(filesInput);
+  document.body.append(frame, form);
+  form.submit();
+  window.setTimeout(() => {
+    frame.remove();
+    form.remove();
+  }, 60_000);
 
   state.downloadingSelected = false;
   updateSelectionUI();
-  elements.selectionSummary.textContent = `Uruchomiono pobieranie ${selectedFiles.length} ${fileWord(selectedFiles.length)}. Jeśli przeglądarka zapyta, zezwól na wiele pobrań.`;
+  elements.selectionSummary.textContent = `Uruchomiono pobieranie archiwum z ${selectedFiles.length} ${fileWord(selectedFiles.length)}.`;
 }
 
 function createPlaceholder(kind) {

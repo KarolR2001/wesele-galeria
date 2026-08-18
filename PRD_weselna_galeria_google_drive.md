@@ -152,8 +152,8 @@ Nie ma interfejsu sortowania. Porządek techniczny jest stały: najnowsze pliki 
 
 1. Zaznacza jeden lub więcej materiałów w galerii.
 2. Naciska „Pobierz zaznaczone”.
-3. Przeglądarka uruchamia osobne pobieranie każdego oryginalnego pliku.
-4. Każdy plik zachowuje oryginalną nazwę.
+3. Przeglądarka pobiera jedno archiwum `wspolne-wspomnienia.zip`.
+4. Archiwum zawiera oryginalne pliki z zachowanymi nazwami; przy powtórzonych nazwach dodawany jest numer.
 
 ---
 
@@ -246,7 +246,7 @@ Zakres `drive.file` ogranicza szkody: token aplikacji nie powinien zapewniać do
 | FR-10 | Zdjęcie otwiera się w podglądzie. |
 | FR-11 | Film ma natywny odtwarzacz i obsługę przewijania. |
 | FR-12 | HEIC/HEVC i nieobsługiwane media mają zapasowy podgląd Google. |
-| FR-13 | Każdy materiał ma pobieranie pojedynczego oryginału, a zaznaczone materiały można pobrać razem jako osobne pliki. |
+| FR-13 | Każdy materiał ma pobieranie pojedynczego oryginału, a zaznaczone materiały można pobrać razem jako jedno archiwum ZIP. |
 | FR-14 | Nie ma usuwania, edycji, opisu, komentarzy ani sortowania w UI. |
 | FR-15 | Endpoint health sprawdza dostęp do właściwego folderu. |
 
@@ -377,6 +377,15 @@ Podgląd/stream oryginału. Przekazuje `Range`.
 ### `GET|HEAD /api/download/:fileId?name=...&resourceKey=...`
 
 Pobieranie oryginału z `Content-Disposition: attachment`.
+
+### `POST /api/download-archive`
+
+Strumieniowe pobieranie jednego archiwum ZIP z zaznaczonych oryginałów. Żądanie
+może być JSON-em albo formularzem `application/x-www-form-urlencoded` z polem
+`files`, zawierającym tablicę obiektów `{ id, name, size, resourceKey }`.
+Endpoint przyjmuje maksymalnie 200 plików i łączny rozmiar deklarowany do 3,5 GB.
+Pliki są dodawane bez kompresji, aby nie obciążać dodatkowo Workera i zachować
+oryginalną zawartość.
 
 ---
 
@@ -3098,7 +3107,8 @@ function sleep(milliseconds) {
 8. Pojawienie się pliku w galerii.
 9. Podgląd z częściowym pobraniem `Range`.
 10. Pobieranie z `Content-Disposition: attachment`.
-11. Usunięcie pliku testowego bez pozostawiania śmieci.
+11. Pobranie archiwum ZIP zawierającego dwa wpisy dla zaznaczenia wieloplikowego.
+12. Usunięcie pliku testowego bez pozostawiania śmieci.
 
 Test wymaga działającego `.dev.vars`. Po niepowodzeniu plik testowy może wymagać ręcznego usunięcia.
 
@@ -3126,6 +3136,7 @@ Agent lub właściciel ma odnotować wynik każdego wiersza.
 | iPhone Safari | MOV/HEVC | upload, odtwarzacz lub Google fallback, download |
 | Android Chrome | JPG/PNG/WebP | upload, podgląd, download |
 | Android Chrome | MP4/H.264 | upload, odtwarzanie i przewijanie |
+| iPhone Safari / Android Chrome | wiele zaznaczonych plików | jedno pobieranie archiwum ZIP zawierającego wszystkie pliki |
 | Desktop Chrome | wiele plików | kolejka działa sekwencyjnie |
 | Rozmiar | zdjęcie 5–20 MB | sukces |
 | Rozmiar | film około 200 MB | sukces i postęp |

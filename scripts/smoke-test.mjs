@@ -127,6 +127,28 @@ try {
   assert(downloadResponse.headers.get("content-disposition")?.startsWith("attachment"), "Brakuje nagłówka attachment.");
   console.log("OK  pobieranie");
 
+  const archiveBody = new URLSearchParams({
+    files: JSON.stringify([
+      { id: uploadedFileId, name: fileName, size: png.length },
+      { id: uploadedFileId, name: fileName, size: png.length },
+    ]),
+  });
+  const archiveResponse = await fetch(`${baseUrl}/api/download-archive`, {
+    method: "POST",
+    body: archiveBody,
+  });
+  assert(archiveResponse.ok, `Archiwum ZIP nie działa: HTTP ${archiveResponse.status}`);
+  assert(archiveResponse.headers.get("content-type")?.startsWith("application/zip"), "Archiwum nie ma typu application/zip.");
+  assert(archiveResponse.headers.get("content-disposition")?.startsWith("attachment"), "Archiwum nie ma nagłówka attachment.");
+  const archiveBytes = new Uint8Array(await archiveResponse.arrayBuffer());
+  assert(readUint32LE(archiveBytes, 0) === 0x04034b50, "Archiwum nie zaczyna się poprawnym nagłówkiem ZIP.");
+  assert(
+    readUint32LE(archiveBytes, archiveBytes.length - 22) === 0x06054b50 &&
+      readUint16LE(archiveBytes, archiveBytes.length - 14) === 2,
+    "Archiwum ZIP nie zawiera dwóch wpisów.",
+  );
+  console.log("OK  archiwum ZIP z wieloma plikami");
+
   console.log("\nWszystkie automatyczne testy smoke zakończyły się powodzeniem.\n");
 } catch (error) {
   console.error(`\nTEST NIEUDANY: ${error instanceof Error ? error.message : String(error)}\n`);
@@ -215,6 +237,14 @@ function required(object, key) {
   const value = object[key];
   assert(value, `Brakuje ${key} w .dev.vars.`);
   return value;
+}
+
+function readUint16LE(bytes, offset) {
+  return new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength).getUint16(offset, true);
+}
+
+function readUint32LE(bytes, offset) {
+  return new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength).getUint32(offset, true);
 }
 
 function assert(condition, message) {

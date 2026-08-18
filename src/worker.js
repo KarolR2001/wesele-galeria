@@ -4,6 +4,10 @@ const TOKEN_URL = "https://oauth2.googleapis.com/token";
 const DEFAULT_PAGE_SIZE = 100;
 const MAX_PAGE_SIZE = 200;
 const UPLOAD_CHUNK_SIZE = 8 * 1024 * 1024;
+const MAX_ARCHIVE_FILES = 200;
+const MAX_ARCHIVE_BYTES = 3_500_000_000;
+const ZIP_FLAG = 0x0808;
+const CRC32_TABLE = createCrc32Table();
 
 let tokenCache = {
   accessToken: null,
@@ -29,6 +33,10 @@ export default {
 
       if (request.method === "POST" && url.pathname === "/api/uploads/init") {
         return handleInitUpload(request, env);
+      }
+
+      if (request.method === "POST" && url.pathname === "/api/download-archive") {
+        return handleDownloadArchive(request, env);
       }
 
       const thumbnailMatch = url.pathname.match(/^\/api\/thumbnail\/([A-Za-z0-9_-]+)$/);
@@ -204,6 +212,184 @@ async function handleInitUpload(request, env) {
   });
 }
 
+async function handleDownloadArchive(request, env) {
+  assertEnv(env);
+
+  let input;
+  try {
+    input = await readArchiveRequest(request);
+  } catch {
+    return json({ error: "Nieprawidłowe dane archiwum." }, 400);
+  }
+
+  let files;
+  try {
+    files = normalizeArchiveFiles(input?.files);
+  } catch (error) {
+    return json({ error: error instanceof Error ? error.message : "Nieprawidłowe pliki archiwum." }, 400);
+  }
+
+  return createArchiveResponse(files, env);
+}
+
+async function readArchiveRequest(request) {
+  const contentType = request.headers.get("Content-Type") || "";
+  if (contentType.includes("application/json")) {
+    return request.json();
+  }
+
+  const formData = await request.formData();
+  const rawFiles = formData.get("files");
+  if (typeof rawFiles !== "string") {
+    throw new Error("Brakuje listy plików.");
+  }
+  return { files: JSON.parse(rawFiles) };
+}
+
+function normalizeArchiveFiles(input) {
+  if (!Array.isArray(input) || input.length === 0) {
+    throw new Error("Nie zaznaczono żadnych plików.");
+  }
+  if (input.length > MAX_ARCHIVE_FILES) {
+    throw new Error(`Można pobrać maksymalnie ${MAX_ARCHIVE_FILES} plików naraz.`);
+  }
+
+  const usedNames = new Set();
+  let declaredBytes = 0;
+  const files = input.map((value, index) => {
+    const id = typeof value?.id === "string" ? value.id.trim() : "";
+    if (!/^[A-Za-z0-9_-]+$/.test(id)) {
+      throw new Error("Lista zawiera nieprawidłowy identyfikator pliku.");
+    }
+
+    const requestedName = normalizeFileName(value?.name) || `plik-${index + 1}`;
+    const size = Number(value?.size || 0);
+    if (!Number.isFinite(size) || size < 0) {
+      throw new Error("Lista zawiera nieprawidłowy rozmiar pliku.");
+    }
+    declaredBytes += size;
+    if (declaredBytes > MAX_ARCHIVE_BYTES) {
+      throw new Error("Wybrane pliki przekraczają maksymalny rozmiar archiwum.");
+    }
+
+    return {
+      id,
+      name: uniqueArchiveName(requestedName, usedNames),
+      resourceKey: typeof value?.resourceKey === "string" ? value.resourceKey.slice(0, 512) : "",
+    };
+  });
+
+  return files;
+}
+
+function uniqueArchiveName(name, usedNames) {
+  const extensionIndex = name.lastIndexOf(".");
+  const base = extensionIndex > 0 ? name.slice(0, extensionIndex) : name;
+  const extension = extensionIndex > 0 ? name.slice(extensionIndex) : "";
+  let candidate = name;
+  let suffix = 2;
+
+  while (usedNames.has(candidate.toLowerCase())) {
+    candidate = `${base} (${suffix})${extension}`;
+    suffix += 1;
+  }
+  usedNames.add(candidate.toLowerCase());
+  return candidate;
+}
+
+function createArchiveResponse(files, env) {
+  const stream = new ReadableStream({
+    async start(controller) {
+      try {
+        await writeZip(files, env, controller);
+      } catch (error) {
+        console.error("Archive download failed", error);
+        controller.error(error);
+      }
+    },
+  });
+
+  const headers = new Headers({
+    "Content-Type": "application/zip",
+    "Cache-Control": "private, no-store",
+    "Content-Disposition": createContentDisposition("attachment", "wspolne-wspomnienia.zip"),
+    "X-Content-Type-Options": "nosniff",
+  });
+
+  return new Response(stream, { status: 200, headers });
+}
+
+async function writeZip(files, env, controller) {
+  const entries = [];
+  const dateTime = getZipDateTime(new Date());
+  let archiveOffset = 0;
+  let totalBytes = 0;
+
+  for (const file of files) {
+    const nameBytes = new TextEncoder().encode(file.name);
+    const localOffset = archiveOffset;
+    const localHeader = createZipLocalHeader(nameBytes, dateTime);
+    controller.enqueue(localHeader);
+    archiveOffset += localHeader.byteLength;
+
+    const response = await fetchDriveFile(file, env);
+    if (!response.ok || !response.body) {
+      throw new Error(`Nie udało się pobrać pliku ${file.name}.`);
+    }
+
+    const reader = response.body.getReader();
+    let crc = 0xffffffff;
+    let size = 0;
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) {
+          break;
+        }
+        crc = updateCrc32(crc, value);
+        size += value.byteLength;
+        totalBytes += value.byteLength;
+        if (totalBytes > MAX_ARCHIVE_BYTES) {
+          throw new Error("Wybrane pliki przekraczają maksymalny rozmiar archiwum.");
+        }
+        controller.enqueue(value);
+        archiveOffset += value.byteLength;
+      }
+    } finally {
+      reader.releaseLock();
+    }
+
+    const checksum = (crc ^ 0xffffffff) >>> 0;
+    const descriptor = createZipDataDescriptor(checksum, size);
+    controller.enqueue(descriptor);
+    archiveOffset += descriptor.byteLength;
+    entries.push({ nameBytes, checksum, size, localOffset, dateTime });
+  }
+
+  const centralDirectoryOffset = archiveOffset;
+  for (const entry of entries) {
+    const centralHeader = createZipCentralHeader(entry);
+    controller.enqueue(centralHeader);
+    archiveOffset += centralHeader.byteLength;
+  }
+
+  controller.enqueue(createZipEndRecord(
+    entries.length,
+    archiveOffset - centralDirectoryOffset,
+    centralDirectoryOffset,
+  ));
+  controller.close();
+}
+
+async function fetchDriveFile(file, env, init = {}) {
+  const endpoint = new URL(`${DRIVE_API}/files/${encodeURIComponent(file.id)}`);
+  endpoint.searchParams.set("alt", "media");
+  if (file.resourceKey) {
+    endpoint.searchParams.set("resourceKey", file.resourceKey);
+  }
+  return googleFetch(env, endpoint, init);
+}
+
 async function handleThumbnail(fileId, env) {
   assertEnv(env);
 
@@ -248,12 +434,6 @@ async function handleThumbnail(fileId, env) {
 async function handleMedia(request, url, fileId, env, forceDownload) {
   assertEnv(env);
 
-  const endpoint = new URL(`${DRIVE_API}/files/${encodeURIComponent(fileId)}`);
-  endpoint.searchParams.set("alt", "media");
-  if (url.searchParams.get("resourceKey")) {
-    endpoint.searchParams.set("resourceKey", url.searchParams.get("resourceKey"));
-  }
-
   const upstreamHeaders = new Headers();
   const range = request.headers.get("Range");
   if (range) {
@@ -266,7 +446,10 @@ async function handleMedia(request, url, fileId, env, forceDownload) {
     upstreamHeaders.set("Range", "bytes=0-0");
   }
 
-  const response = await googleFetch(env, endpoint, {
+  const response = await fetchDriveFile({
+    id: fileId,
+    resourceKey: url.searchParams.get("resourceKey") || "",
+  }, env, {
     method: upstreamMethod,
     headers: upstreamHeaders,
   });
@@ -455,6 +638,100 @@ function createContentDisposition(disposition, fileName) {
     `%${char.charCodeAt(0).toString(16).toUpperCase()}`,
   );
   return `${disposition}; filename="${asciiName}"; filename*=UTF-8''${encoded}`;
+}
+
+function createCrc32Table() {
+  const table = new Uint32Array(256);
+  for (let index = 0; index < table.length; index += 1) {
+    let value = index;
+    for (let bit = 0; bit < 8; bit += 1) {
+      value = value & 1 ? 0xedb88320 ^ (value >>> 1) : value >>> 1;
+    }
+    table[index] = value >>> 0;
+  }
+  return table;
+}
+
+function updateCrc32(crc, bytes) {
+  let value = crc;
+  for (const byte of bytes) {
+    value = CRC32_TABLE[(value ^ byte) & 0xff] ^ (value >>> 8);
+  }
+  return value >>> 0;
+}
+
+function getZipDateTime(date) {
+  const year = Math.max(1980, date.getFullYear());
+  return {
+    time: (date.getHours() << 11) | (date.getMinutes() << 5) | Math.floor(date.getSeconds() / 2),
+    date: ((year - 1980) << 9) | ((date.getMonth() + 1) << 5) | date.getDate(),
+  };
+}
+
+function createZipLocalHeader(nameBytes, dateTime) {
+  const header = new Uint8Array(30 + nameBytes.length);
+  const view = new DataView(header.buffer);
+  view.setUint32(0, 0x04034b50, true);
+  view.setUint16(4, 20, true);
+  view.setUint16(6, ZIP_FLAG, true);
+  view.setUint16(8, 0, true);
+  view.setUint16(10, dateTime.time, true);
+  view.setUint16(12, dateTime.date, true);
+  view.setUint32(14, 0, true);
+  view.setUint32(18, 0, true);
+  view.setUint32(22, 0, true);
+  view.setUint16(26, nameBytes.length, true);
+  view.setUint16(28, 0, true);
+  header.set(nameBytes, 30);
+  return header;
+}
+
+function createZipDataDescriptor(checksum, size) {
+  const descriptor = new Uint8Array(16);
+  const view = new DataView(descriptor.buffer);
+  view.setUint32(0, 0x08074b50, true);
+  view.setUint32(4, checksum, true);
+  view.setUint32(8, size, true);
+  view.setUint32(12, size, true);
+  return descriptor;
+}
+
+function createZipCentralHeader(entry) {
+  const header = new Uint8Array(46 + entry.nameBytes.length);
+  const view = new DataView(header.buffer);
+  view.setUint32(0, 0x02014b50, true);
+  view.setUint16(4, 20, true);
+  view.setUint16(6, 20, true);
+  view.setUint16(8, ZIP_FLAG, true);
+  view.setUint16(10, 0, true);
+  view.setUint16(12, entry.dateTime.time, true);
+  view.setUint16(14, entry.dateTime.date, true);
+  view.setUint32(16, entry.checksum, true);
+  view.setUint32(20, entry.size, true);
+  view.setUint32(24, entry.size, true);
+  view.setUint16(28, entry.nameBytes.length, true);
+  view.setUint16(30, 0, true);
+  view.setUint16(32, 0, true);
+  view.setUint16(34, 0, true);
+  view.setUint16(36, 0, true);
+  view.setUint32(38, 0, true);
+  view.setUint32(42, entry.localOffset, true);
+  header.set(entry.nameBytes, 46);
+  return header;
+}
+
+function createZipEndRecord(entryCount, centralDirectorySize, centralDirectoryOffset) {
+  const record = new Uint8Array(22);
+  const view = new DataView(record.buffer);
+  view.setUint32(0, 0x06054b50, true);
+  view.setUint16(4, 0, true);
+  view.setUint16(6, 0, true);
+  view.setUint16(8, entryCount, true);
+  view.setUint16(10, entryCount, true);
+  view.setUint32(12, centralDirectorySize, true);
+  view.setUint32(16, centralDirectoryOffset, true);
+  view.setUint16(20, 0, true);
+  return record;
 }
 
 function copyHeaders(source, names) {
