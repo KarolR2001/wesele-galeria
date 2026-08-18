@@ -110,10 +110,11 @@ Zapewnić gościom weselnym najkrótszą możliwą ścieżkę:
 - automatyczne ponawianie błędów przejściowych,
 - wznawianie po ponownym wybraniu tego samego pliku,
 - galeria kafelkowa,
+- zaznaczanie wielu materiałów w galerii,
 - otwieranie zdjęcia,
 - odtwarzanie filmu,
 - zapasowy podgląd Google dla formatów, których przeglądarka nie obsługuje,
-- pobieranie pojedynczego pliku,
+- pobieranie pojedynczego lub wielu zaznaczonych plików,
 - automatyczne pobieranie wszystkich elementów galerii stronami po 100 rekordów,
 - ręczne odświeżenie galerii,
 - kod QR,
@@ -149,9 +150,10 @@ Nie ma interfejsu sortowania. Porządek techniczny jest stały: najnowsze pliki 
 
 ### 5.3. Gość pobiera
 
-1. Otwiera materiał.
-2. Naciska „Pobierz plik”.
-3. Otrzymuje oryginalny plik z oryginalną nazwą.
+1. Zaznacza jeden lub więcej materiałów w galerii.
+2. Naciska „Pobierz zaznaczone”.
+3. Przeglądarka uruchamia osobne pobieranie każdego oryginalnego pliku.
+4. Każdy plik zachowuje oryginalną nazwę.
 
 ---
 
@@ -244,7 +246,7 @@ Zakres `drive.file` ogranicza szkody: token aplikacji nie powinien zapewniać do
 | FR-10 | Zdjęcie otwiera się w podglądzie. |
 | FR-11 | Film ma natywny odtwarzacz i obsługę przewijania. |
 | FR-12 | HEIC/HEVC i nieobsługiwane media mają zapasowy podgląd Google. |
-| FR-13 | Każdy materiał ma pobieranie pojedynczego oryginału. |
+| FR-13 | Każdy materiał ma pobieranie pojedynczego oryginału, a zaznaczone materiały można pobrać razem jako osobne pliki. |
 | FR-14 | Nie ma usuwania, edycji, opisu, komentarzy ani sortowania w UI. |
 | FR-15 | Endpoint health sprawdza dostęp do właściwego folderu. |
 
