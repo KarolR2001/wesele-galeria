@@ -2,6 +2,40 @@ const API = "/api";
 const DEFAULT_CHUNK_SIZE = 8 * 1024 * 1024;
 const MAX_RETRIES = 6;
 const SESSION_MAX_AGE_MS = 6 * 24 * 60 * 60 * 1000;
+const SPLASH_DELAY_MS = 3500;
+const SPLASH_FADE_MS = 2000;
+
+let splashExitScheduled = false;
+
+function scheduleSplashExit() {
+  if (splashExitScheduled) {
+    return;
+  }
+  splashExitScheduled = true;
+
+  window.setTimeout(() => {
+    const splash = document.getElementById("splash-screen");
+    if (!splash) {
+      return;
+    }
+
+    const removeSplash = () => splash.remove();
+    splash.addEventListener("animationend", (event) => {
+      if (event.animationName === "splash-disappear") {
+        removeSplash();
+      }
+    }, { once: true });
+    splash.classList.add("fade-out");
+
+    // Do not leave the page blocked if the animation event is not delivered.
+    window.setTimeout(removeSplash, SPLASH_FADE_MS + 250);
+  }, SPLASH_DELAY_MS);
+}
+
+// Start this before the rest of the app is initialized. A stale/cached HTML
+// document must not be able to keep the splash screen over the whole page.
+scheduleSplashExit();
+window.addEventListener("load", scheduleSplashExit, { once: true });
 
 const MIME_BY_EXTENSION = {
   avif: "image/avif",
@@ -52,30 +86,30 @@ const state = {
   downloadingSelected: false,
 };
 
-elements.fileInput.addEventListener("change", handleFileSelection);
-elements.refreshButton.addEventListener("click", () => loadGallery());
-elements.downloadSelectedButton.addEventListener("click", downloadSelectedFiles);
-elements.clearSelectionButton.addEventListener("click", clearSelection);
-elements.viewerClose.addEventListener("click", closeViewer);
-elements.viewer.addEventListener("cancel", (event) => {
+elements.fileInput?.addEventListener("change", handleFileSelection);
+elements.refreshButton?.addEventListener("click", () => loadGallery());
+elements.downloadSelectedButton?.addEventListener("click", downloadSelectedFiles);
+elements.clearSelectionButton?.addEventListener("click", clearSelection);
+elements.viewerClose?.addEventListener("click", closeViewer);
+elements.viewer?.addEventListener("cancel", (event) => {
   event.preventDefault();
   closeViewer();
 });
-elements.viewer.addEventListener("click", (event) => {
+elements.viewer?.addEventListener("click", (event) => {
   if (event.target === elements.viewer || event.target.closest(".viewer-shell") === null && event.target.tagName !== 'BUTTON') {
     closeViewer();
   }
 });
-elements.viewerPrev.addEventListener("click", (e) => {
+elements.viewerPrev?.addEventListener("click", (e) => {
   e.stopPropagation();
   navigateViewer(-1);
 });
-elements.viewerNext.addEventListener("click", (e) => {
+elements.viewerNext?.addEventListener("click", (e) => {
   e.stopPropagation();
   navigateViewer(1);
 });
 document.addEventListener("keydown", (e) => {
-  if (!elements.viewer.open) return;
+  if (!elements.viewer?.open) return;
   if (e.key === "ArrowLeft") navigateViewer(-1);
   if (e.key === "ArrowRight") navigateViewer(1);
 });
@@ -98,20 +132,6 @@ document.addEventListener("visibilitychange", async () => {
   if (document.visibilityState === "visible" && state.uploading) {
     await requestWakeLock();
   }
-});
-
-window.addEventListener("load", () => {
-  setTimeout(() => {
-    const splash = document.getElementById("splash-screen");
-    if (splash) {
-      splash.addEventListener("animationend", (e) => {
-        if (e.animationName === "splash-disappear") {
-          splash.remove();
-        }
-      });
-      splash.classList.add("fade-out");
-    }
-  }, 3500);
 });
 
 loadGallery();
@@ -736,6 +756,10 @@ function reconcileSelection() {
 }
 
 function updateSelectionUI() {
+  if (!elements.downloadSelectedButton || !elements.clearSelectionButton || !elements.selectionSummary) {
+    return;
+  }
+
   const count = state.selectedFileIds.size;
   elements.downloadSelectedButton.hidden = count === 0;
   elements.clearSelectionButton.hidden = count === 0;
