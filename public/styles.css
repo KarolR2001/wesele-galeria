@@ -303,13 +303,6 @@ progress::-moz-progress-bar {
   min-width: 0;
 }
 
-.gallery-status-actions {
-  display: flex;
-  flex: 0 0 auto;
-  align-items: center;
-  gap: 0.75rem;
-}
-
 .gallery-status-row .text-button {
   flex: 0 0 auto;
   padding: 0.7rem 0;
@@ -352,6 +345,8 @@ body.selection-mode main {
   display: flex;
   flex: 0 0 auto;
   align-items: center;
+  flex-wrap: wrap;
+  justify-content: flex-end;
   gap: 0.4rem;
 }
 
@@ -759,6 +754,10 @@ body.dialog-open {
   .selection-toolbar .selection-summary {
     flex: 1 1 100%;
     text-align: center;
+  }
+
+  .selection-toolbar-actions {
+    justify-content: center;
   }
 
   .gallery-actions {

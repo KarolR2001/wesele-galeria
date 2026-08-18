@@ -65,10 +65,7 @@
 
         <div class="gallery-status-row">
           <p id="gallery-status" class="status" role="status" aria-live="polite">Ładowanie galerii…</p>
-          <div class="gallery-status-actions">
-            <button id="selection-mode-button" class="text-button" type="button" aria-pressed="false">Zaznacz</button>
-            <button id="select-all-button" class="text-button" type="button" aria-pressed="false" hidden>Zaznacz wszystkie</button>
-          </div>
+          <button id="selection-mode-button" class="text-button" type="button" aria-pressed="false">Zaznacz</button>
         </div>
         <div id="gallery" class="gallery" aria-live="polite"></div>
       </section>
@@ -77,6 +74,7 @@
     <footer id="selection-toolbar" class="selection-toolbar" aria-label="Zaznaczone pliki" hidden>
       <p id="selection-summary" class="status selection-summary" role="status" aria-live="polite"></p>
       <div class="selection-toolbar-actions">
+        <button id="select-all-button" class="text-button" type="button" aria-pressed="false" hidden>Zaznacz wszystkie</button>
         <button id="download-selected-button" class="primary-button compact" type="button" hidden>Pobierz zaznaczone</button>
         <button id="clear-selection-button" class="text-button" type="button" hidden>Wyczyść zaznaczenie</button>
       </div>
