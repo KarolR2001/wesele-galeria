@@ -74,9 +74,25 @@
     <footer id="selection-toolbar" class="selection-toolbar" aria-label="Zaznaczone pliki" hidden>
       <p id="selection-summary" class="status selection-summary" role="status" aria-live="polite"></p>
       <div class="selection-toolbar-actions">
-        <button id="select-all-button" class="text-button" type="button" aria-pressed="false" hidden>Zaznacz wszystkie</button>
-        <button id="download-selected-button" class="primary-button compact" type="button" hidden>Pobierz zaznaczone</button>
-        <button id="clear-selection-button" class="text-button" type="button" hidden>Wyczyść zaznaczenie</button>
+        <button id="select-all-button" class="text-button selection-toolbar-button" type="button" aria-label="Zaznacz wszystkie" title="Zaznacz wszystkie" aria-pressed="false" hidden>
+          <svg class="selection-action-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+            <rect x="4" y="4" width="16" height="16" rx="3"></rect>
+            <path d="m8 12 2.6 2.6L16.5 9"></path>
+          </svg>
+          <span class="selection-action-label">Zaznacz wszystkie</span>
+        </button>
+        <button id="download-selected-button" class="primary-button compact selection-toolbar-button" type="button" aria-label="Pobierz zaznaczone" title="Pobierz zaznaczone" hidden>
+          <svg class="selection-action-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+            <path d="M12 3v11m0 0 4-4m-4 4-4-4M5 19h14"></path>
+          </svg>
+          <span class="selection-action-label">Pobierz zaznaczone</span>
+        </button>
+        <button id="clear-selection-button" class="text-button selection-toolbar-button" type="button" aria-label="Wyczyść zaznaczenie" title="Wyczyść zaznaczenie" hidden>
+          <svg class="selection-action-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+            <path d="m6 6 12 12M18 6 6 18"></path>
+          </svg>
+          <span class="selection-action-label">Wyczyść zaznaczenie</span>
+        </button>
       </div>
     </footer>
 

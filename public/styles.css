@@ -359,6 +359,38 @@ body.selection-mode main {
   white-space: nowrap;
 }
 
+.selection-toolbar-button {
+  position: relative;
+  width: 2.25rem;
+  min-width: 2.25rem;
+  height: 2.25rem;
+  min-height: 2.25rem !important;
+  padding: 0 !important;
+}
+
+.selection-action-icon {
+  display: block;
+  width: 1.15rem;
+  height: 1.15rem;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.8;
+}
+
+.selection-action-label {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  border: 0;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+}
+
 .selection-toolbar button:disabled {
   cursor: default;
   opacity: 0.45;

@@ -847,9 +847,17 @@ function updateSelectionUI() {
 
   if (elements.selectAllButton) {
     const allSelected = areAllFilesSelected();
+    const selectAllLabel = allSelected ? "Odznacz wszystkie" : "Zaznacz wszystkie";
+    const selectAllLabelElement = elements.selectAllButton.querySelector(".selection-action-label");
     elements.selectAllButton.hidden = !state.selectionMode || state.files.length === 0;
     elements.selectAllButton.disabled = state.downloadingSelected;
-    elements.selectAllButton.textContent = allSelected ? "Odznacz wszystkie" : "Zaznacz wszystkie";
+    if (selectAllLabelElement) {
+      selectAllLabelElement.textContent = selectAllLabel;
+    } else {
+      elements.selectAllButton.textContent = selectAllLabel;
+    }
+    elements.selectAllButton.setAttribute("aria-label", selectAllLabel);
+    elements.selectAllButton.title = selectAllLabel;
     elements.selectAllButton.setAttribute("aria-pressed", String(allSelected));
   }
 }
