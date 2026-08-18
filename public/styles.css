@@ -911,8 +911,9 @@ body.dialog-open {
   }
 
   .hero > .eyebrow {
-    width: 100%;
-    text-align: center;
+    width: 100vw;
+    margin-left: calc((100% - 100vw) / 2);
+    text-align: center !important;
   }
 
   main {
