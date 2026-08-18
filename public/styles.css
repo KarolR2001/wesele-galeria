@@ -305,8 +305,8 @@ progress::-moz-progress-bar {
 
 .gallery-status-row .text-button {
   flex: 0 0 auto;
-  padding: 0.25rem 0;
-  font-size: 0.76rem;
+  padding: 0.7rem 0;
+  font-size: inherit;
 }
 
 .selection-toolbar {
@@ -416,8 +416,19 @@ body.selection-mode main {
   outline-offset: -3px;
 }
 
-.gallery-card.is-selected {
-  box-shadow: 0 0 0 3px var(--accent), 0 8px 26px rgba(49, 49, 49, 0.16);
+.gallery-card::after {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  background: rgba(49, 49, 49, 0.42);
+  content: "";
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 120ms ease;
+}
+
+.gallery-card.is-selected::after {
+  opacity: 1;
 }
 
 .gallery-selection {
@@ -451,11 +462,11 @@ body.selection-mode main {
 
 .gallery-selection-input {
   appearance: none;
-  display: grid;
+  position: relative;
+  display: block;
   width: 1.05rem;
   height: 1.05rem;
   margin: 0;
-  place-content: center;
   border: 1px solid rgba(255, 255, 255, 0.95);
   border-radius: 0.28rem;
   background: transparent;
@@ -463,12 +474,16 @@ body.selection-mode main {
 }
 
 .gallery-selection-input::after {
+  position: absolute;
+  top: 50%;
+  left: 50%;
   width: 0.28rem;
   height: 0.54rem;
+  margin: 0;
   border: solid var(--text);
   border-width: 0 2px 2px 0;
   content: "";
-  transform: rotate(45deg) scale(0);
+  transform: translate(-50%, -60%) rotate(45deg) scale(0);
   transition: transform 100ms ease;
 }
 
@@ -478,7 +493,7 @@ body.selection-mode main {
 }
 
 .gallery-selection-input:checked::after {
-  transform: rotate(45deg) scale(1);
+  transform: translate(-50%, -60%) rotate(45deg) scale(1);
 }
 
 .gallery-selection-input:focus-visible {
