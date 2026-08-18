@@ -59,12 +59,14 @@
             <p id="gallery-title" class="eyebrow">Zdjęcia i filmy gości</p>
           </div>
           <div class="gallery-actions">
-            <button id="selection-mode-button" class="text-button" type="button" aria-pressed="false">Zaznacz</button>
             <button id="refresh-button" class="text-button" type="button">Odśwież</button>
           </div>
         </div>
 
-        <p id="gallery-status" class="status" role="status" aria-live="polite">Ładowanie galerii…</p>
+        <div class="gallery-status-row">
+          <p id="gallery-status" class="status" role="status" aria-live="polite">Ładowanie galerii…</p>
+          <button id="selection-mode-button" class="text-button" type="button" aria-pressed="false">Zaznacz</button>
+        </div>
         <div id="gallery" class="gallery" aria-live="polite"></div>
       </section>
     </main>

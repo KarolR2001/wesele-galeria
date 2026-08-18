@@ -292,6 +292,23 @@ progress::-moz-progress-bar {
   gap: 0.5rem 0.85rem;
 }
 
+.gallery-status-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.gallery-status-row .status {
+  min-width: 0;
+}
+
+.gallery-status-row .text-button {
+  flex: 0 0 auto;
+  padding: 0.25rem 0;
+  font-size: 0.76rem;
+}
+
 .selection-toolbar {
   position: fixed;
   right: 0;
@@ -412,11 +429,12 @@ body.selection-mode main {
   width: 2rem;
   height: 2rem;
   place-items: center;
-  border: 1px solid rgba(255, 255, 255, 0.9);
+  border: 1px solid rgba(255, 255, 255, 0.42);
   border-radius: 0.55rem;
   cursor: pointer;
-  background: rgba(255, 255, 255, 0.88);
+  background: rgba(25, 25, 25, 0.58);
   box-shadow: 0 3px 12px rgba(49, 49, 49, 0.16);
+  backdrop-filter: blur(8px);
   opacity: 0;
   pointer-events: none;
   transform: scale(0.88);
@@ -438,7 +456,7 @@ body.selection-mode main {
   height: 1.05rem;
   margin: 0;
   place-content: center;
-  border: 1px solid rgba(49, 49, 49, 0.38);
+  border: 1px solid rgba(255, 255, 255, 0.95);
   border-radius: 0.28rem;
   background: transparent;
   cursor: pointer;
@@ -447,7 +465,7 @@ body.selection-mode main {
 .gallery-selection-input::after {
   width: 0.28rem;
   height: 0.54rem;
-  border: solid #fff;
+  border: solid var(--text);
   border-width: 0 2px 2px 0;
   content: "";
   transform: rotate(45deg) scale(0);
@@ -455,8 +473,8 @@ body.selection-mode main {
 }
 
 .gallery-selection-input:checked {
-  border-color: var(--accent);
-  background: var(--accent);
+  border-color: #fff;
+  background: #fff;
 }
 
 .gallery-selection-input:checked::after {

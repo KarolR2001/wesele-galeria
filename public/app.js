@@ -789,6 +789,10 @@ function setFileSelected(fileId, selected, card) {
     state.selectedFileIds.delete(fileId);
   }
   card.classList.toggle("is-selected", selected);
+  const checkbox = card.querySelector(".gallery-selection-input");
+  if (checkbox) {
+    checkbox.checked = selected;
+  }
   updateSelectionUI();
 }
 
