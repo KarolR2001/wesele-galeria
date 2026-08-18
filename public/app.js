@@ -63,6 +63,7 @@ const elements = {
   gallery: document.querySelector("#gallery"),
   galleryStatus: document.querySelector("#gallery-status"),
   selectionModeButton: document.querySelector("#selection-mode-button"),
+  selectAllButton: document.querySelector("#select-all-button"),
   selectionToolbar: document.querySelector("#selection-toolbar"),
   selectionSummary: document.querySelector("#selection-summary"),
   downloadSelectedButton: document.querySelector("#download-selected-button"),
@@ -92,6 +93,7 @@ const state = {
 elements.fileInput?.addEventListener("change", handleFileSelection);
 elements.refreshButton?.addEventListener("click", () => loadGallery());
 elements.selectionModeButton?.addEventListener("click", toggleSelectionMode);
+elements.selectAllButton?.addEventListener("click", toggleSelectAll);
 elements.downloadSelectedButton?.addEventListener("click", downloadSelectedFiles);
 elements.clearSelectionButton?.addEventListener("click", clearSelection);
 elements.viewerClose?.addEventListener("click", closeViewer);
@@ -756,6 +758,32 @@ function toggleSelectionMode() {
   setSelectionMode(!state.selectionMode);
 }
 
+function areAllFilesSelected() {
+  return state.files.length > 0 && state.files.every((file) => state.selectedFileIds.has(file.id));
+}
+
+function toggleSelectAll() {
+  if (areAllFilesSelected()) {
+    state.selectedFileIds.clear();
+  } else {
+    state.files.forEach((file) => state.selectedFileIds.add(file.id));
+  }
+
+  syncGallerySelectionState();
+  updateSelectionUI();
+}
+
+function syncGallerySelectionState() {
+  elements.gallery?.querySelectorAll(".gallery-card").forEach((card) => {
+    const selected = state.selectionMode && state.selectedFileIds.has(card.dataset.fileId);
+    card.classList.toggle("is-selected", selected);
+    const checkbox = card.querySelector(".gallery-selection-input");
+    if (checkbox) {
+      checkbox.checked = selected;
+    }
+  });
+}
+
 function setSelectionMode(enabled) {
   state.selectionMode = enabled;
   document.body.classList.toggle("selection-mode", enabled);
@@ -766,14 +794,10 @@ function setSelectionMode(enabled) {
     elements.selectionModeButton.setAttribute("aria-pressed", String(enabled));
   }
 
+  syncGallerySelectionState();
   elements.gallery?.querySelectorAll(".gallery-card").forEach((card) => {
     const file = state.files.find((entry) => entry.id === card.dataset.fileId);
     const mediaButton = card.querySelector(".gallery-card-media");
-    const checkbox = card.querySelector(".gallery-selection-input");
-    card.classList.toggle("is-selected", enabled && state.selectedFileIds.has(card.dataset.fileId));
-    if (checkbox) {
-      checkbox.checked = enabled && state.selectedFileIds.has(card.dataset.fileId);
-    }
     if (file && mediaButton) {
       mediaButton.setAttribute("aria-label", galleryMediaLabel(file));
     }
@@ -820,17 +844,19 @@ function updateSelectionUI() {
   elements.selectionSummary.textContent = count > 0
     ? `Zaznaczono ${count} ${itemWord(count)}.`
     : "";
+
+  if (elements.selectAllButton) {
+    const allSelected = areAllFilesSelected();
+    elements.selectAllButton.hidden = !state.selectionMode || state.files.length === 0;
+    elements.selectAllButton.disabled = state.downloadingSelected;
+    elements.selectAllButton.textContent = allSelected ? "Odznacz wszystkie" : "Zaznacz wszystkie";
+    elements.selectAllButton.setAttribute("aria-pressed", String(allSelected));
+  }
 }
 
 function clearSelection() {
   state.selectedFileIds.clear();
-  elements.gallery.querySelectorAll(".gallery-card").forEach((card) => {
-    card.classList.remove("is-selected");
-    const checkbox = card.querySelector(".gallery-selection-input");
-    if (checkbox) {
-      checkbox.checked = false;
-    }
-  });
+  syncGallerySelectionState();
   updateSelectionUI();
 }
 

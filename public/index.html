@@ -65,7 +65,10 @@
 
         <div class="gallery-status-row">
           <p id="gallery-status" class="status" role="status" aria-live="polite">Ładowanie galerii…</p>
-          <button id="selection-mode-button" class="text-button" type="button" aria-pressed="false">Zaznacz</button>
+          <div class="gallery-status-actions">
+            <button id="selection-mode-button" class="text-button" type="button" aria-pressed="false">Zaznacz</button>
+            <button id="select-all-button" class="text-button" type="button" aria-pressed="false" hidden>Zaznacz wszystkie</button>
+          </div>
         </div>
         <div id="gallery" class="gallery" aria-live="polite"></div>
       </section>
