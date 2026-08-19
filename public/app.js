@@ -2,6 +2,7 @@ const API = "/api";
 const DEFAULT_CHUNK_SIZE = 8 * 1024 * 1024;
 const MAX_RETRIES = 6;
 const SESSION_MAX_AGE_MS = 6 * 24 * 60 * 60 * 1000;
+const MAX_SELECTION_FILES = 45;
 const SPLASH_DELAY_MS = 3500;
 const SPLASH_FADE_MS = 2000;
 
@@ -87,6 +88,7 @@ const state = {
   currentFileIndex: -1,
   selectionMode: false,
   selectedFileIds: new Set(),
+  selectionLimitReached: false,
   downloadingSelected: false,
 };
 
@@ -763,10 +765,18 @@ function areAllFilesSelected() {
 }
 
 function toggleSelectAll() {
-  if (areAllFilesSelected()) {
+  const selectionIsComplete = areAllFilesSelected() || state.selectedFileIds.size >= MAX_SELECTION_FILES;
+  if (selectionIsComplete) {
     state.selectedFileIds.clear();
+    state.selectionLimitReached = false;
   } else {
-    state.files.forEach((file) => state.selectedFileIds.add(file.id));
+    for (const file of state.files) {
+      if (state.selectedFileIds.size >= MAX_SELECTION_FILES) {
+        break;
+      }
+      state.selectedFileIds.add(file.id);
+    }
+    state.selectionLimitReached = state.files.length > MAX_SELECTION_FILES;
   }
 
   syncGallerySelectionState();
@@ -786,6 +796,9 @@ function syncGallerySelectionState() {
 
 function setSelectionMode(enabled) {
   state.selectionMode = enabled;
+  if (!enabled) {
+    state.selectionLimitReached = false;
+  }
   document.body.classList.toggle("selection-mode", enabled);
   elements.gallery?.classList.toggle("selection-mode", enabled);
 
@@ -807,10 +820,22 @@ function setSelectionMode(enabled) {
 }
 
 function setFileSelected(fileId, selected, card) {
+  if (selected && !state.selectedFileIds.has(fileId) && state.selectedFileIds.size >= MAX_SELECTION_FILES) {
+    state.selectionLimitReached = true;
+    card.classList.remove("is-selected");
+    const blockedCheckbox = card.querySelector(".gallery-selection-input");
+    if (blockedCheckbox) {
+      blockedCheckbox.checked = false;
+    }
+    updateSelectionUI();
+    return;
+  }
+
   if (selected) {
     state.selectedFileIds.add(fileId);
   } else {
     state.selectedFileIds.delete(fileId);
+    state.selectionLimitReached = false;
   }
   card.classList.toggle("is-selected", selected);
   const checkbox = card.querySelector(".gallery-selection-input");
@@ -841,13 +866,22 @@ function updateSelectionUI() {
   elements.clearSelectionButton.hidden = !state.selectionMode;
   elements.downloadSelectedButton.disabled = count === 0 || state.downloadingSelected;
   elements.clearSelectionButton.disabled = count === 0 || state.downloadingSelected;
-  elements.selectionSummary.textContent = count > 0
-    ? `Zaznaczono ${count} ${itemWord(count)}.`
-    : "";
+  if (state.selectionLimitReached || count >= MAX_SELECTION_FILES) {
+    elements.selectionSummary.textContent = `Osiągnięto limit ${MAX_SELECTION_FILES} plików.`;
+  } else if (count > 0) {
+    elements.selectionSummary.textContent = `Zaznaczono ${count} ${itemWord(count)}. Maksymalnie ${MAX_SELECTION_FILES}.`;
+  } else {
+    elements.selectionSummary.textContent = `Maksymalnie ${MAX_SELECTION_FILES} plików w jednym pobieraniu.`;
+  }
 
   if (elements.selectAllButton) {
-    const allSelected = areAllFilesSelected();
-    const selectAllLabel = allSelected ? "Odznacz wszystkie" : "Zaznacz wszystkie";
+    const allFilesSelected = areAllFilesSelected();
+    const selectionComplete = allFilesSelected || count >= MAX_SELECTION_FILES;
+    const selectAllLabel = allFilesSelected
+      ? "Odznacz wszystkie"
+      : selectionComplete
+        ? "Wyczyść zaznaczenie"
+        : "Zaznacz wszystkie";
     const selectAllLabelElement = elements.selectAllButton.querySelector(".selection-action-label");
     elements.selectAllButton.hidden = !state.selectionMode || state.files.length === 0;
     elements.selectAllButton.disabled = state.downloadingSelected;
@@ -858,12 +892,13 @@ function updateSelectionUI() {
     }
     elements.selectAllButton.setAttribute("aria-label", selectAllLabel);
     elements.selectAllButton.title = selectAllLabel;
-    elements.selectAllButton.setAttribute("aria-pressed", String(allSelected));
+    elements.selectAllButton.setAttribute("aria-pressed", String(selectionComplete));
   }
 }
 
 function clearSelection() {
   state.selectedFileIds.clear();
+  state.selectionLimitReached = false;
   syncGallerySelectionState();
   updateSelectionUI();
 }

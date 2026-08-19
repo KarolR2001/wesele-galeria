@@ -158,6 +158,20 @@ try {
   );
   console.log("OK  archiwum ZIP z wieloma plikami");
 
+  const tooManyFiles = new URLSearchParams({
+    files: JSON.stringify(Array.from({ length: 46 }, (_, index) => ({
+      id: `limit-test-${index}`,
+      name: `limit-test-${index}.jpg`,
+      size: 0,
+    }))),
+  });
+  const limitResponse = await fetch(`${baseUrl}/api/download-archive`, {
+    method: "POST",
+    body: tooManyFiles,
+  });
+  assert(limitResponse.status === 400, `Limit 45 plików nie działa: HTTP ${limitResponse.status}`);
+  console.log("OK  blokada archiwum powyżej 45 plików");
+
   console.log("\nWszystkie automatyczne testy smoke zakończyły się powodzeniem.\n");
 } catch (error) {
   console.error(`\nTEST NIEUDANY: ${error instanceof Error ? error.message : String(error)}\n`);

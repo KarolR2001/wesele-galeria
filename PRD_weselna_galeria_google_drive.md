@@ -384,7 +384,7 @@ Pobieranie oryginału z `Content-Disposition: attachment`.
 Strumieniowe pobieranie jednego archiwum ZIP z co najmniej dwóch zaznaczonych oryginałów. Żądanie
 może być JSON-em albo formularzem `application/x-www-form-urlencoded` z polem
 `files`, zawierającym tablicę obiektów `{ id, name, size, resourceKey }`.
-Endpoint przyjmuje maksymalnie 300 plików i łączny rozmiar deklarowany do 15 GB.
+Endpoint przyjmuje maksymalnie 45 plików i łączny rozmiar deklarowany do 15 GB.
 Używa ZIP64 i dodaje pliki bez kompresji, aby obsłużyć archiwa większe niż 4 GB,
 nie obciążać dodatkowo Workera i zachować oryginalną zawartość.
 
