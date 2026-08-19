@@ -4,8 +4,10 @@ const TOKEN_URL = "https://oauth2.googleapis.com/token";
 const DEFAULT_PAGE_SIZE = 100;
 const MAX_PAGE_SIZE = 200;
 const UPLOAD_CHUNK_SIZE = 8 * 1024 * 1024;
-const MAX_ARCHIVE_FILES = 200;
-const MAX_ARCHIVE_BYTES = 3_500_000_000;
+const MAX_ARCHIVE_FILES = 300;
+const MAX_ARCHIVE_BYTES = 15_000_000_000;
+const ZIP32_MAX = 0xffffffff;
+const ZIP64_VERSION = 45;
 const ZIP_FLAG = 0x0808;
 const CRC32_TABLE = createCrc32Table();
 
@@ -275,6 +277,7 @@ function normalizeArchiveFiles(input) {
     return {
       id,
       name: uniqueArchiveName(requestedName, usedNames),
+      declaredSize: size,
       resourceKey: typeof value?.resourceKey === "string" ? value.resourceKey.slice(0, 512) : "",
     };
   });
@@ -322,13 +325,14 @@ function createArchiveResponse(files, env) {
 async function writeZip(files, env, controller) {
   const entries = [];
   const dateTime = getZipDateTime(new Date());
+  const textEncoder = new TextEncoder();
   let archiveOffset = 0;
   let totalBytes = 0;
 
   for (const file of files) {
-    const nameBytes = new TextEncoder().encode(file.name);
+    const nameBytes = textEncoder.encode(file.name);
     const localOffset = archiveOffset;
-    const localHeader = createZipLocalHeader(nameBytes, dateTime);
+    const localHeader = createZipLocalHeader(nameBytes, dateTime, file.declaredSize);
     controller.enqueue(localHeader);
     archiveOffset += localHeader.byteLength;
 
@@ -373,11 +377,20 @@ async function writeZip(files, env, controller) {
     archiveOffset += centralHeader.byteLength;
   }
 
-  controller.enqueue(createZipEndRecord(
+  const centralDirectorySize = archiveOffset - centralDirectoryOffset;
+  const zip64EndOffset = archiveOffset;
+  const zip64EndRecord = createZip64EndRecord(
     entries.length,
-    archiveOffset - centralDirectoryOffset,
+    centralDirectorySize,
     centralDirectoryOffset,
-  ));
+  );
+  controller.enqueue(zip64EndRecord);
+  archiveOffset += zip64EndRecord.byteLength;
+
+  const zip64Locator = createZip64EndLocator(zip64EndOffset);
+  controller.enqueue(zip64Locator);
+  archiveOffset += zip64Locator.byteLength;
+  controller.enqueue(createZipEndRecord());
   controller.close();
 }
 
@@ -668,68 +681,111 @@ function getZipDateTime(date) {
   };
 }
 
-function createZipLocalHeader(nameBytes, dateTime) {
-  const header = new Uint8Array(30 + nameBytes.length);
+function setUint64LE(view, offset, value) {
+  view.setBigUint64(offset, BigInt(Math.trunc(value)), true);
+}
+
+function createZip64Extra(values) {
+  const extra = new Uint8Array(4 + values.length * 8);
+  const view = new DataView(extra.buffer);
+  view.setUint16(0, 0x0001, true);
+  view.setUint16(2, values.length * 8, true);
+  values.forEach((value, index) => setUint64LE(view, 4 + index * 8, value));
+  return extra;
+}
+
+function createZipLocalHeader(nameBytes, dateTime, declaredSize) {
+  const extra = createZip64Extra([declaredSize, declaredSize]);
+  const header = new Uint8Array(30 + nameBytes.length + extra.length);
   const view = new DataView(header.buffer);
   view.setUint32(0, 0x04034b50, true);
-  view.setUint16(4, 20, true);
+  view.setUint16(4, ZIP64_VERSION, true);
   view.setUint16(6, ZIP_FLAG, true);
   view.setUint16(8, 0, true);
   view.setUint16(10, dateTime.time, true);
   view.setUint16(12, dateTime.date, true);
   view.setUint32(14, 0, true);
-  view.setUint32(18, 0, true);
-  view.setUint32(22, 0, true);
+  view.setUint32(18, ZIP32_MAX, true);
+  view.setUint32(22, ZIP32_MAX, true);
   view.setUint16(26, nameBytes.length, true);
-  view.setUint16(28, 0, true);
+  view.setUint16(28, extra.length, true);
   header.set(nameBytes, 30);
+  header.set(extra, 30 + nameBytes.length);
   return header;
 }
 
 function createZipDataDescriptor(checksum, size) {
-  const descriptor = new Uint8Array(16);
+  const descriptor = new Uint8Array(24);
   const view = new DataView(descriptor.buffer);
   view.setUint32(0, 0x08074b50, true);
   view.setUint32(4, checksum, true);
-  view.setUint32(8, size, true);
-  view.setUint32(12, size, true);
+  setUint64LE(view, 8, size);
+  setUint64LE(view, 16, size);
   return descriptor;
 }
 
 function createZipCentralHeader(entry) {
-  const header = new Uint8Array(46 + entry.nameBytes.length);
+  const extra = createZip64Extra([entry.size, entry.size, entry.localOffset]);
+  const header = new Uint8Array(46 + entry.nameBytes.length + extra.length);
   const view = new DataView(header.buffer);
   view.setUint32(0, 0x02014b50, true);
-  view.setUint16(4, 20, true);
-  view.setUint16(6, 20, true);
+  view.setUint16(4, ZIP64_VERSION, true);
+  view.setUint16(6, ZIP64_VERSION, true);
   view.setUint16(8, ZIP_FLAG, true);
   view.setUint16(10, 0, true);
   view.setUint16(12, entry.dateTime.time, true);
   view.setUint16(14, entry.dateTime.date, true);
   view.setUint32(16, entry.checksum, true);
-  view.setUint32(20, entry.size, true);
-  view.setUint32(24, entry.size, true);
+  view.setUint32(20, ZIP32_MAX, true);
+  view.setUint32(24, ZIP32_MAX, true);
   view.setUint16(28, entry.nameBytes.length, true);
-  view.setUint16(30, 0, true);
+  view.setUint16(30, extra.length, true);
   view.setUint16(32, 0, true);
   view.setUint16(34, 0, true);
   view.setUint16(36, 0, true);
   view.setUint32(38, 0, true);
-  view.setUint32(42, entry.localOffset, true);
+  view.setUint32(42, ZIP32_MAX, true);
   header.set(entry.nameBytes, 46);
+  header.set(extra, 46 + entry.nameBytes.length);
   return header;
 }
 
-function createZipEndRecord(entryCount, centralDirectorySize, centralDirectoryOffset) {
+function createZip64EndRecord(entryCount, centralDirectorySize, centralDirectoryOffset) {
+  const record = new Uint8Array(56);
+  const view = new DataView(record.buffer);
+  view.setUint32(0, 0x06064b50, true);
+  setUint64LE(view, 4, 44);
+  view.setUint16(12, ZIP64_VERSION, true);
+  view.setUint16(14, ZIP64_VERSION, true);
+  view.setUint32(16, 0, true);
+  view.setUint32(20, 0, true);
+  setUint64LE(view, 24, entryCount);
+  setUint64LE(view, 32, entryCount);
+  setUint64LE(view, 40, centralDirectorySize);
+  setUint64LE(view, 48, centralDirectoryOffset);
+  return record;
+}
+
+function createZip64EndLocator(zip64EndOffset) {
+  const locator = new Uint8Array(20);
+  const view = new DataView(locator.buffer);
+  view.setUint32(0, 0x07064b50, true);
+  view.setUint32(4, 0, true);
+  setUint64LE(view, 8, zip64EndOffset);
+  view.setUint32(16, 1, true);
+  return locator;
+}
+
+function createZipEndRecord() {
   const record = new Uint8Array(22);
   const view = new DataView(record.buffer);
   view.setUint32(0, 0x06054b50, true);
   view.setUint16(4, 0, true);
   view.setUint16(6, 0, true);
-  view.setUint16(8, entryCount, true);
-  view.setUint16(10, entryCount, true);
-  view.setUint32(12, centralDirectorySize, true);
-  view.setUint32(16, centralDirectoryOffset, true);
+  view.setUint16(8, 0xffff, true);
+  view.setUint16(10, 0xffff, true);
+  view.setUint32(12, ZIP32_MAX, true);
+  view.setUint32(16, ZIP32_MAX, true);
   view.setUint16(20, 0, true);
   return record;
 }

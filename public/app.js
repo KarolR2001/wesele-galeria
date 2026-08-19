@@ -879,6 +879,23 @@ function downloadSelectedFiles() {
     return;
   }
 
+  if (selectedFiles.length === 1) {
+    const file = selectedFiles[0];
+    const resourceKey = file.resourceKey ? `&resourceKey=${encodeURIComponent(file.resourceKey)}` : "";
+    const name = encodeURIComponent(file.name);
+    const link = document.createElement("a");
+    link.href = `${API}/download/${encodeURIComponent(file.id)}?name=${name}${resourceKey}`;
+    link.download = file.name;
+    link.rel = "noopener";
+    link.hidden = true;
+    document.body.append(link);
+    link.click();
+    link.remove();
+
+    elements.selectionSummary.textContent = "Uruchomiono pobieranie oryginalnego pliku.";
+    return;
+  }
+
   state.downloadingSelected = true;
   updateSelectionUI();
   elements.selectionSummary.textContent = `Uruchamianie pobierania ${selectedFiles.length} ${fileWord(selectedFiles.length)}…`;

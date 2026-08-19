@@ -142,9 +142,18 @@ try {
   assert(archiveResponse.headers.get("content-disposition")?.startsWith("attachment"), "Archiwum nie ma nagłówka attachment.");
   const archiveBytes = new Uint8Array(await archiveResponse.arrayBuffer());
   assert(readUint32LE(archiveBytes, 0) === 0x04034b50, "Archiwum nie zaczyna się poprawnym nagłówkiem ZIP.");
+  const endOffset = archiveBytes.length - 22;
+  const locatorOffset = endOffset - 20;
+  assert(readUint32LE(archiveBytes, locatorOffset) === 0x07064b50, "Archiwum nie zawiera lokatora ZIP64.");
+  const zip64EndOffset = Number(readUint64LE(archiveBytes, locatorOffset + 8));
+  assert(readUint32LE(archiveBytes, zip64EndOffset) === 0x06064b50, "Archiwum nie zawiera rekordu ZIP64.");
+  const centralDirectorySize = Number(readUint64LE(archiveBytes, zip64EndOffset + 40));
+  const centralDirectoryOffset = Number(readUint64LE(archiveBytes, zip64EndOffset + 48));
   assert(
-    readUint32LE(archiveBytes, archiveBytes.length - 22) === 0x06054b50 &&
-      readUint16LE(archiveBytes, archiveBytes.length - 14) === 2,
+    readUint32LE(archiveBytes, endOffset) === 0x06054b50 &&
+      readUint64LE(archiveBytes, zip64EndOffset + 32) === 2n &&
+      centralDirectoryOffset + centralDirectorySize === zip64EndOffset &&
+      readUint32LE(archiveBytes, centralDirectoryOffset) === 0x02014b50,
     "Archiwum ZIP nie zawiera dwóch wpisów.",
   );
   console.log("OK  archiwum ZIP z wieloma plikami");
@@ -245,6 +254,10 @@ function readUint16LE(bytes, offset) {
 
 function readUint32LE(bytes, offset) {
   return new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength).getUint32(offset, true);
+}
+
+function readUint64LE(bytes, offset) {
+  return new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength).getBigUint64(offset, true);
 }
 
 function assert(condition, message) {
