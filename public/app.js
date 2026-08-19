@@ -883,11 +883,16 @@ function downloadSelectedFiles() {
   updateSelectionUI();
   elements.selectionSummary.textContent = `Uruchamianie pobierania ${selectedFiles.length} ${fileWord(selectedFiles.length)}…`;
 
-  const frameName = `download-archive-${Date.now()}`;
-  const frame = document.createElement("iframe");
-  frame.name = frameName;
-  frame.hidden = true;
-  frame.setAttribute("aria-hidden", "true");
+  const frameName = "download-archive-frame";
+  let frame = document.getElementById(frameName);
+  if (!frame) {
+    frame = document.createElement("iframe");
+    frame.id = frameName;
+    frame.name = frameName;
+    frame.hidden = true;
+    frame.setAttribute("aria-hidden", "true");
+    document.body.append(frame);
+  }
 
   const form = document.createElement("form");
   form.method = "post";
@@ -906,12 +911,15 @@ function downloadSelectedFiles() {
   })));
 
   form.append(filesInput);
-  document.body.append(frame, form);
-  form.submit();
-  window.setTimeout(() => {
-    frame.remove();
+  document.body.append(form);
+  try {
+    form.submit();
+  } finally {
+    // The iframe must remain alive for the whole navigation. Removing it on a
+    // timer can truncate larger archives before their central directory is
+    // received, especially on mobile connections.
     form.remove();
-  }, 60_000);
+  }
 
   state.downloadingSelected = false;
   updateSelectionUI();
