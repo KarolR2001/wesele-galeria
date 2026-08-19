@@ -64,7 +64,6 @@ const elements = {
   gallery: document.querySelector("#gallery"),
   galleryStatus: document.querySelector("#gallery-status"),
   selectionModeButton: document.querySelector("#selection-mode-button"),
-  selectAllButton: document.querySelector("#select-all-button"),
   selectionToolbar: document.querySelector("#selection-toolbar"),
   selectionSummary: document.querySelector("#selection-summary"),
   downloadSelectedButton: document.querySelector("#download-selected-button"),
@@ -95,7 +94,6 @@ const state = {
 elements.fileInput?.addEventListener("change", handleFileSelection);
 elements.refreshButton?.addEventListener("click", () => loadGallery());
 elements.selectionModeButton?.addEventListener("click", toggleSelectionMode);
-elements.selectAllButton?.addEventListener("click", toggleSelectAll);
 elements.downloadSelectedButton?.addEventListener("click", downloadSelectedFiles);
 elements.clearSelectionButton?.addEventListener("click", clearSelection);
 elements.viewerClose?.addEventListener("click", closeViewer);
@@ -760,29 +758,6 @@ function toggleSelectionMode() {
   setSelectionMode(!state.selectionMode);
 }
 
-function areAllFilesSelected() {
-  return state.files.length > 0 && state.files.every((file) => state.selectedFileIds.has(file.id));
-}
-
-function toggleSelectAll() {
-  const selectionIsComplete = areAllFilesSelected() || state.selectedFileIds.size >= MAX_SELECTION_FILES;
-  if (selectionIsComplete) {
-    state.selectedFileIds.clear();
-    state.selectionLimitReached = false;
-  } else {
-    for (const file of state.files) {
-      if (state.selectedFileIds.size >= MAX_SELECTION_FILES) {
-        break;
-      }
-      state.selectedFileIds.add(file.id);
-    }
-    state.selectionLimitReached = state.files.length > MAX_SELECTION_FILES;
-  }
-
-  syncGallerySelectionState();
-  updateSelectionUI();
-}
-
 function syncGallerySelectionState() {
   elements.gallery?.querySelectorAll(".gallery-card").forEach((card) => {
     const selected = state.selectionMode && state.selectedFileIds.has(card.dataset.fileId);
@@ -874,26 +849,6 @@ function updateSelectionUI() {
     elements.selectionSummary.textContent = `Maksymalnie ${MAX_SELECTION_FILES} plików w jednym pobieraniu.`;
   }
 
-  if (elements.selectAllButton) {
-    const allFilesSelected = areAllFilesSelected();
-    const selectionComplete = allFilesSelected || count >= MAX_SELECTION_FILES;
-    const selectAllLabel = allFilesSelected
-      ? "Odznacz wszystkie"
-      : selectionComplete
-        ? "Wyczyść zaznaczenie"
-        : "Zaznacz wszystkie";
-    const selectAllLabelElement = elements.selectAllButton.querySelector(".selection-action-label");
-    elements.selectAllButton.hidden = !state.selectionMode || state.files.length === 0;
-    elements.selectAllButton.disabled = state.downloadingSelected;
-    if (selectAllLabelElement) {
-      selectAllLabelElement.textContent = selectAllLabel;
-    } else {
-      elements.selectAllButton.textContent = selectAllLabel;
-    }
-    elements.selectAllButton.setAttribute("aria-label", selectAllLabel);
-    elements.selectAllButton.title = selectAllLabel;
-    elements.selectAllButton.setAttribute("aria-pressed", String(selectionComplete));
-  }
 }
 
 function clearSelection() {
