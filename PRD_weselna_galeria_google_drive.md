@@ -385,8 +385,9 @@ Strumieniowe pobieranie jednego archiwum ZIP z co najmniej dwóch zaznaczonych o
 może być JSON-em albo formularzem `application/x-www-form-urlencoded` z polem
 `files`, zawierającym tablicę obiektów `{ id, name, size, resourceKey }`.
 Endpoint przyjmuje maksymalnie 45 plików i łączny rozmiar deklarowany do 15 GB.
-Używa ZIP64 i dodaje pliki bez kompresji, aby obsłużyć archiwa większe niż 4 GB,
-nie obciążać dodatkowo Workera i zachować oryginalną zawartość.
+Dodaje pliki bez kompresji, zachowując oryginalną zawartość. Dla archiwów mieszczących się
+w klasycznym limicie ZIP używa kompatybilnego ZIP32, a ZIP64 włącza tylko wtedy, gdy
+rozmiar danych lub położenie wpisów wymaga obsługi archiwów większych niż 4 GB.
 
 ---
 

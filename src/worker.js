@@ -7,6 +7,7 @@ const UPLOAD_CHUNK_SIZE = 8 * 1024 * 1024;
 const MAX_ARCHIVE_FILES = 45;
 const MAX_ARCHIVE_BYTES = 15_000_000_000;
 const ZIP32_MAX = 0xffffffff;
+const ZIP32_VERSION = 20;
 const ZIP64_VERSION = 45;
 const ZIP_FLAG = 0x0808;
 const CRC32_TABLE = createCrc32Table();
@@ -326,13 +327,14 @@ async function writeZip(files, env, controller) {
   const entries = [];
   const dateTime = getZipDateTime(new Date());
   const textEncoder = new TextEncoder();
+  const zip64 = shouldUseZip64(files, textEncoder);
   let archiveOffset = 0;
   let totalBytes = 0;
 
   for (const file of files) {
     const nameBytes = textEncoder.encode(file.name);
     const localOffset = archiveOffset;
-    const localHeader = createZipLocalHeader(nameBytes, dateTime, file.declaredSize);
+    const localHeader = createZipLocalHeader(nameBytes, dateTime, file.declaredSize, zip64);
     controller.enqueue(localHeader);
     archiveOffset += localHeader.byteLength;
 
@@ -356,6 +358,9 @@ async function writeZip(files, env, controller) {
         if (totalBytes > MAX_ARCHIVE_BYTES) {
           throw new Error("Wybrane pliki przekraczają maksymalny rozmiar archiwum.");
         }
+        if (!zip64 && (size > ZIP32_MAX - value.byteLength || archiveOffset > ZIP32_MAX - value.byteLength)) {
+          throw new Error("Archiwum przekracza rozmiar obsługiwany przez klasyczny format ZIP.");
+        }
         controller.enqueue(value);
         archiveOffset += value.byteLength;
       }
@@ -364,7 +369,7 @@ async function writeZip(files, env, controller) {
     }
 
     const checksum = (crc ^ 0xffffffff) >>> 0;
-    const descriptor = createZipDataDescriptor(checksum, size);
+    const descriptor = createZipDataDescriptor(checksum, size, zip64);
     controller.enqueue(descriptor);
     archiveOffset += descriptor.byteLength;
     entries.push({ nameBytes, checksum, size, localOffset, dateTime });
@@ -372,26 +377,50 @@ async function writeZip(files, env, controller) {
 
   const centralDirectoryOffset = archiveOffset;
   for (const entry of entries) {
-    const centralHeader = createZipCentralHeader(entry);
+    const centralHeader = createZipCentralHeader(entry, zip64);
     controller.enqueue(centralHeader);
     archiveOffset += centralHeader.byteLength;
   }
 
   const centralDirectorySize = archiveOffset - centralDirectoryOffset;
-  const zip64EndOffset = archiveOffset;
-  const zip64EndRecord = createZip64EndRecord(
-    entries.length,
-    centralDirectorySize,
-    centralDirectoryOffset,
-  );
-  controller.enqueue(zip64EndRecord);
-  archiveOffset += zip64EndRecord.byteLength;
+  if (zip64) {
+    const zip64EndOffset = archiveOffset;
+    const zip64EndRecord = createZip64EndRecord(
+      entries.length,
+      centralDirectorySize,
+      centralDirectoryOffset,
+    );
+    controller.enqueue(zip64EndRecord);
+    archiveOffset += zip64EndRecord.byteLength;
 
-  const zip64Locator = createZip64EndLocator(zip64EndOffset);
-  controller.enqueue(zip64Locator);
-  archiveOffset += zip64Locator.byteLength;
-  controller.enqueue(createZipEndRecord());
+    const zip64Locator = createZip64EndLocator(zip64EndOffset);
+    controller.enqueue(zip64Locator);
+    archiveOffset += zip64Locator.byteLength;
+    controller.enqueue(createZipEndRecord(entries.length, centralDirectorySize, centralDirectoryOffset, true));
+  } else {
+    controller.enqueue(createZipEndRecord(entries.length, centralDirectorySize, centralDirectoryOffset, false));
+  }
   controller.close();
+}
+
+function shouldUseZip64(files, textEncoder) {
+  let dataSize = 0;
+  let centralDirectorySize = 0;
+
+  for (const file of files) {
+    const nameSize = textEncoder.encode(file.name).byteLength;
+    if (file.declaredSize >= ZIP32_MAX || files.length >= 0xffff) {
+      return true;
+    }
+
+    dataSize += 30 + nameSize + 16 + file.declaredSize;
+    centralDirectorySize += 46 + nameSize;
+  }
+
+  // ZIP32 stores the end of the central directory in 32-bit offsets. Keep
+  // the archive in ZIP64 when headers plus payload would reach the sentinel
+  // value, even if the declared file data alone is below 4 GiB.
+  return dataSize + centralDirectorySize + 22 >= ZIP32_MAX;
 }
 
 async function fetchDriveFile(file, env, init = {}) {
@@ -694,19 +723,19 @@ function createZip64Extra(values) {
   return extra;
 }
 
-function createZipLocalHeader(nameBytes, dateTime, declaredSize) {
-  const extra = createZip64Extra([declaredSize, declaredSize]);
+function createZipLocalHeader(nameBytes, dateTime, declaredSize, zip64) {
+  const extra = zip64 ? createZip64Extra([declaredSize, declaredSize]) : new Uint8Array(0);
   const header = new Uint8Array(30 + nameBytes.length + extra.length);
   const view = new DataView(header.buffer);
   view.setUint32(0, 0x04034b50, true);
-  view.setUint16(4, ZIP64_VERSION, true);
+  view.setUint16(4, zip64 ? ZIP64_VERSION : ZIP32_VERSION, true);
   view.setUint16(6, ZIP_FLAG, true);
   view.setUint16(8, 0, true);
   view.setUint16(10, dateTime.time, true);
   view.setUint16(12, dateTime.date, true);
   view.setUint32(14, 0, true);
-  view.setUint32(18, ZIP32_MAX, true);
-  view.setUint32(22, ZIP32_MAX, true);
+  view.setUint32(18, zip64 ? ZIP32_MAX : 0, true);
+  view.setUint32(22, zip64 ? ZIP32_MAX : 0, true);
   view.setUint16(26, nameBytes.length, true);
   view.setUint16(28, extra.length, true);
   header.set(nameBytes, 30);
@@ -714,37 +743,44 @@ function createZipLocalHeader(nameBytes, dateTime, declaredSize) {
   return header;
 }
 
-function createZipDataDescriptor(checksum, size) {
-  const descriptor = new Uint8Array(24);
+function createZipDataDescriptor(checksum, size, zip64) {
+  const descriptor = new Uint8Array(zip64 ? 24 : 16);
   const view = new DataView(descriptor.buffer);
   view.setUint32(0, 0x08074b50, true);
   view.setUint32(4, checksum, true);
-  setUint64LE(view, 8, size);
-  setUint64LE(view, 16, size);
+  if (zip64) {
+    setUint64LE(view, 8, size);
+    setUint64LE(view, 16, size);
+  } else {
+    view.setUint32(8, size, true);
+    view.setUint32(12, size, true);
+  }
   return descriptor;
 }
 
-function createZipCentralHeader(entry) {
-  const extra = createZip64Extra([entry.size, entry.size, entry.localOffset]);
+function createZipCentralHeader(entry, zip64) {
+  const extra = zip64
+    ? createZip64Extra([entry.size, entry.size, entry.localOffset])
+    : new Uint8Array(0);
   const header = new Uint8Array(46 + entry.nameBytes.length + extra.length);
   const view = new DataView(header.buffer);
   view.setUint32(0, 0x02014b50, true);
-  view.setUint16(4, ZIP64_VERSION, true);
-  view.setUint16(6, ZIP64_VERSION, true);
+  view.setUint16(4, zip64 ? ZIP64_VERSION : ZIP32_VERSION, true);
+  view.setUint16(6, zip64 ? ZIP64_VERSION : ZIP32_VERSION, true);
   view.setUint16(8, ZIP_FLAG, true);
   view.setUint16(10, 0, true);
   view.setUint16(12, entry.dateTime.time, true);
   view.setUint16(14, entry.dateTime.date, true);
   view.setUint32(16, entry.checksum, true);
-  view.setUint32(20, ZIP32_MAX, true);
-  view.setUint32(24, ZIP32_MAX, true);
+  view.setUint32(20, zip64 ? ZIP32_MAX : entry.size, true);
+  view.setUint32(24, zip64 ? ZIP32_MAX : entry.size, true);
   view.setUint16(28, entry.nameBytes.length, true);
   view.setUint16(30, extra.length, true);
   view.setUint16(32, 0, true);
   view.setUint16(34, 0, true);
   view.setUint16(36, 0, true);
   view.setUint32(38, 0, true);
-  view.setUint32(42, ZIP32_MAX, true);
+  view.setUint32(42, zip64 ? ZIP32_MAX : entry.localOffset, true);
   header.set(entry.nameBytes, 46);
   header.set(extra, 46 + entry.nameBytes.length);
   return header;
@@ -776,16 +812,16 @@ function createZip64EndLocator(zip64EndOffset) {
   return locator;
 }
 
-function createZipEndRecord() {
+function createZipEndRecord(entryCount, centralDirectorySize, centralDirectoryOffset, zip64) {
   const record = new Uint8Array(22);
   const view = new DataView(record.buffer);
   view.setUint32(0, 0x06054b50, true);
   view.setUint16(4, 0, true);
   view.setUint16(6, 0, true);
-  view.setUint16(8, 0xffff, true);
-  view.setUint16(10, 0xffff, true);
-  view.setUint32(12, ZIP32_MAX, true);
-  view.setUint32(16, ZIP32_MAX, true);
+  view.setUint16(8, zip64 ? 0xffff : entryCount, true);
+  view.setUint16(10, zip64 ? 0xffff : entryCount, true);
+  view.setUint32(12, zip64 ? ZIP32_MAX : centralDirectorySize, true);
+  view.setUint32(16, zip64 ? ZIP32_MAX : centralDirectoryOffset, true);
   view.setUint16(20, 0, true);
   return record;
 }
