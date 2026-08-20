@@ -1,8 +1,8 @@
 # Galeria dla gości
 
-Lekka, współdzielona galeria zdjęć i filmów przeznaczona dla gości wydarzeń. Uczestnicy mogą bez zakładania konta dodawać materiały, przeglądać całą galerię i pobierać pojedyncze oryginalne pliki.
+Lekka, współdzielona galeria zdjęć i filmów przeznaczona dla gości wydarzeń. Uczestnicy dołączają przez link, dodają materiały, przeglądają całą galerię i pobierają pojedyncze oryginalne pliki.
 
-Aplikacja jest przygotowana przede wszystkim z myślą o telefonach, ale ma również responsywny układ dla tabletów i komputerów. Nie wymaga frameworka frontendowego ani osobnej bazy danych.
+Aplikacja jest przygotowana przede wszystkim z myślą o telefonach, a responsywny układ obsługuje również tablety i komputery. Frontend korzysta z lekkiego HTML, CSS i JavaScriptu, a pliki są przechowywane w Google Drive.
 
 ## Funkcje
 
@@ -10,16 +10,14 @@ Aplikacja jest przygotowana przede wszystkim z myślą o telefonach, ale ma rów
 - wysyłanie wielu zdjęć i filmów w kolejce,
 - wznawialny upload do Google Drive w częściach po 8 MiB,
 - ponawianie błędów przejściowych oraz obsługa chwilowej utraty połączenia,
-- galeria ładowana stronami bez ograniczenia do pierwszych 100 elementów,
+- automatyczne ładowanie kolejnych stron galerii dla dowolnej liczby elementów,
 - leniwe ładowanie miniaturek i fallback przez Workera,
 - podgląd zdjęć i natywne odtwarzanie filmów,
-- fallback Google Drive dla formatów nieobsługiwanych przez przeglądarkę,
+- fallback Google Drive dla formatów wymagających zewnętrznego podglądu,
 - viewer z nawigacją klawiaturą, przyciskiem Escape i obsługą ekranów dotykowych,
 - pobieranie każdego oryginalnego pliku osobno,
-- responsywny layout desktopowy bez zmiany mobilnego interfejsu,
+- responsywny layout desktopowy z zachowaniem mobilnego interfejsu,
 - obsługa safe-area, `prefers-reduced-motion` i zoomu przeglądarki.
-
-Aplikacja nie ma trybu zaznaczania wielu plików i nie tworzy archiwów ZIP. Pobieranie odbywa się pojedynczo z poziomu viewera.
 
 ## Architektura
 
@@ -27,7 +25,7 @@ Aplikacja nie ma trybu zaznaczania wielu plików i nie tworzy archiwów ZIP. Pob
 - **Backend:** Cloudflare Workers.
 - **Magazyn plików:** Google Drive API.
 - **Hosting assetów:** Cloudflare Workers Assets.
-- **Konfiguracja lokalna:** plik `.dev.vars`, ignorowany przez Git.
+- **Konfiguracja lokalna:** sekrety Google Drive zapisane w pliku `.dev.vars`, ignorowanym przez Git.
 
 ### Struktura projektu
 
@@ -105,7 +103,7 @@ Worker korzysta z następujących zmiennych:
 | `GOOGLE_REFRESH_TOKEN` | token odświeżania dostępu do Google Drive |
 | `GOOGLE_FOLDER_ID` | folder przechowujący pliki galerii |
 
-Pliku `.dev.vars` nie należy dodawać do repozytorium ani udostępniać publicznie.
+Plik `.dev.vars` pozostaje lokalny i jest ignorowany przez Git.
 
 ## Wdrożenie
 
@@ -149,17 +147,16 @@ W odpowiedzi powinno pojawić się `"ok": true` oraz nazwa skonfigurowanego fold
 | `GET`, `HEAD` | `/api/media/:id` | podgląd lub streaming pliku |
 | `GET`, `HEAD` | `/api/download/:id` | pobranie pojedynczego oryginału |
 
-## Bezpieczeństwo i ograniczenia
+## Bezpieczeństwo
 
-- Dostęp do galerii zapewnia posiadanie linku; aplikacja nie ma logowania gości.
+- Dostęp do galerii otrzymują osoby posiadające link.
 - Tokeny OAuth są przechowywane jako sekrety Cloudflare i lokalnie w ignorowanym pliku `.dev.vars`.
 - Pliki są przechowywane w Google Drive, a Worker pośredniczy w listowaniu, podglądzie i pobieraniu.
-- Worker nie buforuje całych dużych plików w pamięci — przekazuje odpowiedzi strumieniowo i obsługuje żądania `Range`.
-- Aplikacja nie usuwa ani nie edytuje plików z poziomu interfejsu.
+- Worker przekazuje duże pliki strumieniowo i obsługuje żądania `Range`.
 
 ## Najczęstsze problemy
 
-### Galeria nie ładuje plików
+### Diagnostyka ładowania galerii
 
 Sprawdź `/api/health`, poprawność `GOOGLE_FOLDER_ID` oraz ważność tokenu OAuth.
 
@@ -167,6 +164,6 @@ Sprawdź `/api/health`, poprawność `GOOGLE_FOLDER_ID` oraz ważność tokenu O
 
 Pozostaw stronę otwartą, sprawdź połączenie z Internetem i wybierz ten sam plik ponownie. Aplikacja wykorzystuje zapisane sesje uploadu do wznowienia przesyłania.
 
-### Format nie otwiera się w przeglądarce
+### Obsługa formatów multimedialnych
 
 Użyj przycisku „Otwórz” w Google Drive albo „Pobierz”, aby otrzymać oryginalny plik.
