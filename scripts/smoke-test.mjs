@@ -1,4 +1,4 @@
-import { readFile, writeFile } from "node:fs/promises";
+import { readFile } from "node:fs/promises";
 
 const TOKEN_URL = "https://oauth2.googleapis.com/token";
 const DRIVE_API = "https://www.googleapis.com/drive/v3";
@@ -127,89 +127,6 @@ try {
   assert(downloadResponse.headers.get("content-disposition")?.startsWith("attachment"), "Brakuje nagłówka attachment.");
   console.log("OK  pobieranie");
 
-  const archiveBody = new URLSearchParams({
-    files: JSON.stringify([
-      { id: uploadedFileId, name: fileName, size: png.length },
-      { id: uploadedFileId, name: fileName, size: png.length },
-    ]),
-  });
-  const archiveResponse = await fetch(`${baseUrl}/api/download-archive`, {
-    method: "POST",
-    body: archiveBody,
-  });
-  assert(archiveResponse.ok, `Archiwum ZIP nie działa: HTTP ${archiveResponse.status}`);
-  assert(archiveResponse.headers.get("content-type")?.startsWith("application/zip"), "Archiwum nie ma typu application/zip.");
-  assert(archiveResponse.headers.get("content-disposition")?.startsWith("attachment"), "Archiwum nie ma nagłówka attachment.");
-  assert(archiveResponse.headers.get("content-length"), "Archiwum ZIP32 nie ma nagłówka Content-Length.");
-  const archiveBytes = new Uint8Array(await archiveResponse.arrayBuffer());
-  assert(
-    Number(archiveResponse.headers.get("content-length")) === archiveBytes.byteLength,
-    "Content-Length archiwum ZIP32 nie zgadza się z liczbą pobranych bajtów.",
-  );
-  if (process.env.ARCHIVE_TEST_PATH) {
-    await writeFile(process.env.ARCHIVE_TEST_PATH, archiveBytes);
-  }
-  assert(readUint32LE(archiveBytes, 0) === 0x04034b50, "Archiwum nie zaczyna się poprawnym nagłówkiem ZIP.");
-  const endOffset = archiveBytes.length - 22;
-  const locatorOffset = endOffset - 20;
-  const centralDirectorySize = readUint32LE(archiveBytes, endOffset + 12);
-  const centralDirectoryOffset = readUint32LE(archiveBytes, endOffset + 16);
-  assert(
-    readUint32LE(archiveBytes, endOffset) === 0x06054b50 &&
-      readUint16LE(archiveBytes, endOffset + 8) === 2 &&
-      readUint16LE(archiveBytes, endOffset + 10) === 2 &&
-      centralDirectoryOffset + centralDirectorySize === endOffset &&
-      readUint32LE(archiveBytes, centralDirectoryOffset) === 0x02014b50,
-    "Archiwum ZIP32 nie zawiera dwóch wpisów.",
-  );
-  assert(readUint32LE(archiveBytes, locatorOffset) !== 0x07064b50, "Małe archiwum nie powinno wymuszać ZIP64.");
-  console.log("OK  standardowe archiwum ZIP32 z wieloma plikami");
-
-  const zip64ArchiveBody = new URLSearchParams({
-    files: JSON.stringify([
-      { id: uploadedFileId, name: `zip64-${fileName}`, size: 0x100000000 },
-      { id: uploadedFileId, name: `zip64-copy-${fileName}`, size: 0 },
-    ]),
-  });
-  const zip64Response = await fetch(`${baseUrl}/api/download-archive`, {
-    method: "POST",
-    body: zip64ArchiveBody,
-  });
-  assert(zip64Response.ok, `Archiwum ZIP64 nie działa: HTTP ${zip64Response.status}`);
-  const zip64Bytes = new Uint8Array(await zip64Response.arrayBuffer());
-  if (process.env.ARCHIVE_ZIP64_TEST_PATH) {
-    await writeFile(process.env.ARCHIVE_ZIP64_TEST_PATH, zip64Bytes);
-  }
-  const zip64EndClassicOffset = zip64Bytes.length - 22;
-  const zip64LocatorOffset = zip64EndClassicOffset - 20;
-  assert(readUint32LE(zip64Bytes, zip64LocatorOffset) === 0x07064b50, "Archiwum ZIP64 nie zawiera lokatora.");
-  const zip64EndOffset = Number(readUint64LE(zip64Bytes, zip64LocatorOffset + 8));
-  assert(readUint32LE(zip64Bytes, zip64EndOffset) === 0x06064b50, "Archiwum ZIP64 nie zawiera rekordu końcowego.");
-  const zip64CentralDirectorySize = Number(readUint64LE(zip64Bytes, zip64EndOffset + 40));
-  const zip64CentralDirectoryOffset = Number(readUint64LE(zip64Bytes, zip64EndOffset + 48));
-  assert(
-    readUint32LE(zip64Bytes, zip64EndClassicOffset) === 0x06054b50 &&
-      readUint64LE(zip64Bytes, zip64EndOffset + 32) === 2n &&
-      zip64CentralDirectoryOffset + zip64CentralDirectorySize === zip64EndOffset &&
-      readUint32LE(zip64Bytes, zip64CentralDirectoryOffset) === 0x02014b50,
-    "Archiwum ZIP64 nie zawiera dwóch wpisów.",
-  );
-  console.log("OK  archiwum ZIP64 dla dużych plików");
-
-  const tooManyFiles = new URLSearchParams({
-    files: JSON.stringify(Array.from({ length: 46 }, (_, index) => ({
-      id: `limit-test-${index}`,
-      name: `limit-test-${index}.jpg`,
-      size: 0,
-    }))),
-  });
-  const limitResponse = await fetch(`${baseUrl}/api/download-archive`, {
-    method: "POST",
-    body: tooManyFiles,
-  });
-  assert(limitResponse.status === 400, `Limit 45 plików nie działa: HTTP ${limitResponse.status}`);
-  console.log("OK  blokada archiwum powyżej 45 plików");
-
   console.log("\nWszystkie automatyczne testy smoke zakończyły się powodzeniem.\n");
 } catch (error) {
   console.error(`\nTEST NIEUDANY: ${error instanceof Error ? error.message : String(error)}\n`);
@@ -298,18 +215,6 @@ function required(object, key) {
   const value = object[key];
   assert(value, `Brakuje ${key} w .dev.vars.`);
   return value;
-}
-
-function readUint16LE(bytes, offset) {
-  return new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength).getUint16(offset, true);
-}
-
-function readUint32LE(bytes, offset) {
-  return new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength).getUint32(offset, true);
-}
-
-function readUint64LE(bytes, offset) {
-  return new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength).getBigUint64(offset, true);
 }
 
 function assert(condition, message) {

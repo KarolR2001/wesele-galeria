@@ -2,7 +2,6 @@ const API = "/api";
 const DEFAULT_CHUNK_SIZE = 8 * 1024 * 1024;
 const MAX_RETRIES = 6;
 const SESSION_MAX_AGE_MS = 6 * 24 * 60 * 60 * 1000;
-const MAX_SELECTION_FILES = 45;
 const SPLASH_DELAY_MS = 3500;
 const SPLASH_FADE_MS = 2000;
 
@@ -63,11 +62,6 @@ const elements = {
   uploadQueue: document.querySelector("#upload-queue"),
   gallery: document.querySelector("#gallery"),
   galleryStatus: document.querySelector("#gallery-status"),
-  selectionModeButton: document.querySelector("#selection-mode-button"),
-  selectionToolbar: document.querySelector("#selection-toolbar"),
-  selectionSummary: document.querySelector("#selection-summary"),
-  downloadSelectedButton: document.querySelector("#download-selected-button"),
-  clearSelectionButton: document.querySelector("#clear-selection-button"),
   refreshButton: document.querySelector("#refresh-button"),
   viewer: document.querySelector("#viewer"),
   viewerTitle: document.querySelector("#viewer-title"),
@@ -85,17 +79,10 @@ const state = {
   wakeLock: null,
   files: [],
   currentFileIndex: -1,
-  selectionMode: false,
-  selectedFileIds: new Set(),
-  selectionLimitReached: false,
-  downloadingSelected: false,
 };
 
 elements.fileInput?.addEventListener("change", handleFileSelection);
 elements.refreshButton?.addEventListener("click", () => loadGallery());
-elements.selectionModeButton?.addEventListener("click", toggleSelectionMode);
-elements.downloadSelectedButton?.addEventListener("click", downloadSelectedFiles);
-elements.clearSelectionButton?.addEventListener("click", clearSelection);
 elements.viewerClose?.addEventListener("click", closeViewer);
 elements.viewer?.addEventListener("cancel", (event) => {
   event.preventDefault();
@@ -658,8 +645,6 @@ async function loadGallery({ quiet = false } = {}) {
       }
     } while (pageToken);
 
-    reconcileSelection();
-
     const total = elements.gallery.childElementCount;
     if (total === 0) {
       const empty = document.createElement("div");
@@ -686,22 +671,11 @@ async function loadGallery({ quiet = false } = {}) {
 }
 
 function createGalleryCard(file) {
-  const card = document.createElement("article");
-  card.className = "gallery-card";
-  card.dataset.fileId = file.id;
-  card.classList.toggle("is-selected", state.selectedFileIds.has(file.id));
-
-  const mediaButton = document.createElement("button");
-  mediaButton.className = "gallery-card-media";
-  mediaButton.type = "button";
-  mediaButton.setAttribute("aria-label", galleryMediaLabel(file));
-  mediaButton.addEventListener("click", () => {
-    if (state.selectionMode) {
-      setFileSelected(file.id, !state.selectedFileIds.has(file.id), card);
-      return;
-    }
-    openViewer(file);
-  });
+  const button = document.createElement("button");
+  button.className = "gallery-card";
+  button.type = "button";
+  button.setAttribute("aria-label", `${file.kind === "video" ? "Odtwórz film" : "Otwórz zdjęcie"}: ${file.name}`);
+  button.addEventListener("click", () => openViewer(file));
 
   if (file.thumbnailLink) {
     const image = document.createElement("img");
@@ -719,9 +693,9 @@ function createGalleryCard(file) {
         image.replaceWith(createPlaceholder(file.kind));
       }
     });
-    mediaButton.append(image);
+    button.append(image);
   } else {
-    mediaButton.append(createPlaceholder(file.kind));
+    button.append(createPlaceholder(file.kind));
   }
 
   if (file.kind === "video") {
@@ -729,208 +703,9 @@ function createGalleryCard(file) {
     badge.className = "video-badge";
     badge.innerHTML = `<svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>`;
     badge.setAttribute("aria-hidden", "true");
-    mediaButton.append(badge);
+    button.append(badge);
   }
-
-  const selectionLabel = document.createElement("label");
-  selectionLabel.className = "gallery-selection";
-  selectionLabel.title = `Zaznacz: ${file.name}`;
-
-  const checkbox = document.createElement("input");
-  checkbox.className = "gallery-selection-input";
-  checkbox.type = "checkbox";
-  checkbox.checked = state.selectedFileIds.has(file.id);
-  checkbox.setAttribute("aria-label", `Zaznacz ${file.kind === "video" ? "film" : "zdjęcie"}: ${file.name}`);
-  checkbox.addEventListener("change", () => setFileSelected(file.id, checkbox.checked, card));
-
-  selectionLabel.append(checkbox);
-  card.append(mediaButton, selectionLabel);
-  return card;
-}
-
-function galleryMediaLabel(file) {
-  return state.selectionMode
-    ? `Zaznacz ${file.kind === "video" ? "film" : "zdjęcie"}: ${file.name}`
-    : `${file.kind === "video" ? "Odtwórz film" : "Otwórz zdjęcie"}: ${file.name}`;
-}
-
-function toggleSelectionMode() {
-  setSelectionMode(!state.selectionMode);
-}
-
-function syncGallerySelectionState() {
-  elements.gallery?.querySelectorAll(".gallery-card").forEach((card) => {
-    const selected = state.selectionMode && state.selectedFileIds.has(card.dataset.fileId);
-    card.classList.toggle("is-selected", selected);
-    const checkbox = card.querySelector(".gallery-selection-input");
-    if (checkbox) {
-      checkbox.checked = selected;
-    }
-  });
-}
-
-function setSelectionMode(enabled) {
-  state.selectionMode = enabled;
-  if (!enabled) {
-    state.selectionLimitReached = false;
-  }
-  document.body.classList.toggle("selection-mode", enabled);
-  elements.gallery?.classList.toggle("selection-mode", enabled);
-
-  if (elements.selectionModeButton) {
-    elements.selectionModeButton.textContent = enabled ? "Zakończ" : "Zaznacz";
-    elements.selectionModeButton.setAttribute("aria-pressed", String(enabled));
-  }
-
-  syncGallerySelectionState();
-  elements.gallery?.querySelectorAll(".gallery-card").forEach((card) => {
-    const file = state.files.find((entry) => entry.id === card.dataset.fileId);
-    const mediaButton = card.querySelector(".gallery-card-media");
-    if (file && mediaButton) {
-      mediaButton.setAttribute("aria-label", galleryMediaLabel(file));
-    }
-  });
-
-  updateSelectionUI();
-}
-
-function setFileSelected(fileId, selected, card) {
-  if (selected && !state.selectedFileIds.has(fileId) && state.selectedFileIds.size >= MAX_SELECTION_FILES) {
-    state.selectionLimitReached = true;
-    card.classList.remove("is-selected");
-    const blockedCheckbox = card.querySelector(".gallery-selection-input");
-    if (blockedCheckbox) {
-      blockedCheckbox.checked = false;
-    }
-    updateSelectionUI();
-    return;
-  }
-
-  if (selected) {
-    state.selectedFileIds.add(fileId);
-  } else {
-    state.selectedFileIds.delete(fileId);
-    state.selectionLimitReached = false;
-  }
-  card.classList.toggle("is-selected", selected);
-  const checkbox = card.querySelector(".gallery-selection-input");
-  if (checkbox) {
-    checkbox.checked = selected;
-  }
-  updateSelectionUI();
-}
-
-function reconcileSelection() {
-  const availableIds = new Set(state.files.map((file) => file.id));
-  for (const fileId of state.selectedFileIds) {
-    if (!availableIds.has(fileId)) {
-      state.selectedFileIds.delete(fileId);
-    }
-  }
-  updateSelectionUI();
-}
-
-function updateSelectionUI() {
-  if (!elements.selectionToolbar || !elements.downloadSelectedButton || !elements.clearSelectionButton || !elements.selectionSummary) {
-    return;
-  }
-
-  const count = state.selectedFileIds.size;
-  elements.selectionToolbar.hidden = !state.selectionMode;
-  elements.downloadSelectedButton.hidden = !state.selectionMode;
-  elements.clearSelectionButton.hidden = !state.selectionMode;
-  elements.downloadSelectedButton.disabled = count === 0 || state.downloadingSelected;
-  elements.clearSelectionButton.disabled = count === 0 || state.downloadingSelected;
-  if (state.selectionLimitReached || count >= MAX_SELECTION_FILES) {
-    elements.selectionSummary.textContent = `Osiągnięto limit ${MAX_SELECTION_FILES} plików.`;
-  } else if (count > 0) {
-    elements.selectionSummary.textContent = `Zaznaczono ${count} ${itemWord(count)}. Maksymalnie ${MAX_SELECTION_FILES}.`;
-  } else {
-    elements.selectionSummary.textContent = `Maksymalnie ${MAX_SELECTION_FILES} plików w jednym pobieraniu.`;
-  }
-
-}
-
-function clearSelection() {
-  state.selectedFileIds.clear();
-  state.selectionLimitReached = false;
-  syncGallerySelectionState();
-  updateSelectionUI();
-}
-
-function downloadSelectedFiles() {
-  if (state.downloadingSelected) {
-    return;
-  }
-
-  const selectedFiles = state.files.filter((file) => state.selectedFileIds.has(file.id));
-  if (selectedFiles.length === 0) {
-    updateSelectionUI();
-    return;
-  }
-
-  if (selectedFiles.length === 1) {
-    const file = selectedFiles[0];
-    const resourceKey = file.resourceKey ? `&resourceKey=${encodeURIComponent(file.resourceKey)}` : "";
-    const name = encodeURIComponent(file.name);
-    const link = document.createElement("a");
-    link.href = `${API}/download/${encodeURIComponent(file.id)}?name=${name}${resourceKey}`;
-    link.download = file.name;
-    link.rel = "noopener";
-    link.hidden = true;
-    document.body.append(link);
-    link.click();
-    link.remove();
-
-    elements.selectionSummary.textContent = "Uruchomiono pobieranie oryginalnego pliku.";
-    return;
-  }
-
-  state.downloadingSelected = true;
-  updateSelectionUI();
-  elements.selectionSummary.textContent = `Uruchamianie pobierania ${selectedFiles.length} ${fileWord(selectedFiles.length)}…`;
-
-  const frameName = "download-archive-frame";
-  let frame = document.getElementById(frameName);
-  if (!frame) {
-    frame = document.createElement("iframe");
-    frame.id = frameName;
-    frame.name = frameName;
-    frame.hidden = true;
-    frame.setAttribute("aria-hidden", "true");
-    document.body.append(frame);
-  }
-
-  const form = document.createElement("form");
-  form.method = "post";
-  form.action = `${API}/download-archive`;
-  form.target = frameName;
-  form.hidden = true;
-
-  const filesInput = document.createElement("input");
-  filesInput.type = "hidden";
-  filesInput.name = "files";
-  filesInput.value = JSON.stringify(selectedFiles.map((file) => ({
-    id: file.id,
-    name: file.name,
-    size: file.size,
-    resourceKey: file.resourceKey || "",
-  })));
-
-  form.append(filesInput);
-  document.body.append(form);
-  try {
-    form.submit();
-  } finally {
-    // The iframe must remain alive for the whole navigation. Removing it on a
-    // timer can truncate larger archives before their central directory is
-    // received, especially on mobile connections.
-    form.remove();
-  }
-
-  state.downloadingSelected = false;
-  updateSelectionUI();
-  elements.selectionSummary.textContent = `Uruchomiono pobieranie archiwum z ${selectedFiles.length} ${fileWord(selectedFiles.length)}.`;
+  return button;
 }
 
 function createPlaceholder(kind) {
