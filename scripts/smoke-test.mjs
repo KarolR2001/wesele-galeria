@@ -140,7 +140,12 @@ try {
   assert(archiveResponse.ok, `Archiwum ZIP nie działa: HTTP ${archiveResponse.status}`);
   assert(archiveResponse.headers.get("content-type")?.startsWith("application/zip"), "Archiwum nie ma typu application/zip.");
   assert(archiveResponse.headers.get("content-disposition")?.startsWith("attachment"), "Archiwum nie ma nagłówka attachment.");
+  assert(archiveResponse.headers.get("content-length"), "Archiwum ZIP32 nie ma nagłówka Content-Length.");
   const archiveBytes = new Uint8Array(await archiveResponse.arrayBuffer());
+  assert(
+    Number(archiveResponse.headers.get("content-length")) === archiveBytes.byteLength,
+    "Content-Length archiwum ZIP32 nie zgadza się z liczbą pobranych bajtów.",
+  );
   if (process.env.ARCHIVE_TEST_PATH) {
     await writeFile(process.env.ARCHIVE_TEST_PATH, archiveBytes);
   }

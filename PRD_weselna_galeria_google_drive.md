@@ -388,6 +388,8 @@ Endpoint przyjmuje maksymalnie 45 plików i łączny rozmiar deklarowany do 15 G
 Dodaje pliki bez kompresji, zachowując oryginalną zawartość. Dla archiwów mieszczących się
 w klasycznym limicie ZIP używa kompatybilnego ZIP32, a ZIP64 włącza tylko wtedy, gdy
 rozmiar danych lub położenie wpisów wymaga obsługi archiwów większych niż 4 GB.
+Dla ZIP32 odpowiedź używa strumienia o znanej długości, aby mobilne menedżery pobierania
+mogły poprawnie zapisać i zweryfikować całe archiwum.
 
 ---
 

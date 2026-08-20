@@ -302,16 +302,24 @@ function uniqueArchiveName(name, usedNames) {
 }
 
 function createArchiveResponse(files, env) {
-  const stream = new ReadableStream({
-    async start(controller) {
-      try {
-        await writeZip(files, env, controller);
-      } catch (error) {
-        console.error("Archive download failed", error);
-        controller.error(error);
-      }
-    },
-  });
+  const textEncoder = new TextEncoder();
+  const zip64 = shouldUseZip64(files, textEncoder);
+  const archiveLength = zip64 ? null : getZip32Length(files, textEncoder);
+  const fixedLength = !zip64 && typeof globalThis.FixedLengthStream === "function"
+    ? new globalThis.FixedLengthStream(archiveLength)
+    : null;
+  const output = fixedLength || new TransformStream();
+  const writer = output.writable.getWriter();
+
+  void (async () => {
+    try {
+      await writeZip(files, env, writer, zip64);
+      await writer.close();
+    } catch (error) {
+      console.error("Archive download failed", error);
+      await writer.abort(error).catch(() => {});
+    }
+  })();
 
   const headers = new Headers({
     "Content-Type": "application/zip",
@@ -319,15 +327,17 @@ function createArchiveResponse(files, env) {
     "Content-Disposition": createContentDisposition("attachment", "wspolne-wspomnienia.zip"),
     "X-Content-Type-Options": "nosniff",
   });
+  if (fixedLength) {
+    headers.set("Content-Length", String(archiveLength));
+  }
 
-  return new Response(stream, { status: 200, headers });
+  return new Response(output.readable, { status: 200, headers });
 }
 
-async function writeZip(files, env, controller) {
+async function writeZip(files, env, writer, zip64) {
   const entries = [];
   const dateTime = getZipDateTime(new Date());
   const textEncoder = new TextEncoder();
-  const zip64 = shouldUseZip64(files, textEncoder);
   let archiveOffset = 0;
   let totalBytes = 0;
 
@@ -335,7 +345,7 @@ async function writeZip(files, env, controller) {
     const nameBytes = textEncoder.encode(file.name);
     const localOffset = archiveOffset;
     const localHeader = createZipLocalHeader(nameBytes, dateTime, file.declaredSize, zip64);
-    controller.enqueue(localHeader);
+    await writer.write(localHeader);
     archiveOffset += localHeader.byteLength;
 
     const response = await fetchDriveFile(file, env);
@@ -361,16 +371,20 @@ async function writeZip(files, env, controller) {
         if (!zip64 && (size > ZIP32_MAX - value.byteLength || archiveOffset > ZIP32_MAX - value.byteLength)) {
           throw new Error("Archiwum przekracza rozmiar obsługiwany przez klasyczny format ZIP.");
         }
-        controller.enqueue(value);
+        await writer.write(value);
         archiveOffset += value.byteLength;
       }
     } finally {
       reader.releaseLock();
     }
 
+    if (!zip64 && size !== file.declaredSize) {
+      throw new Error(`Rozmiar pliku ${file.name} zmienił się podczas pobierania.`);
+    }
+
     const checksum = (crc ^ 0xffffffff) >>> 0;
     const descriptor = createZipDataDescriptor(checksum, size, zip64);
-    controller.enqueue(descriptor);
+    await writer.write(descriptor);
     archiveOffset += descriptor.byteLength;
     entries.push({ nameBytes, checksum, size, localOffset, dateTime });
   }
@@ -378,7 +392,7 @@ async function writeZip(files, env, controller) {
   const centralDirectoryOffset = archiveOffset;
   for (const entry of entries) {
     const centralHeader = createZipCentralHeader(entry, zip64);
-    controller.enqueue(centralHeader);
+    await writer.write(centralHeader);
     archiveOffset += centralHeader.byteLength;
   }
 
@@ -390,17 +404,16 @@ async function writeZip(files, env, controller) {
       centralDirectorySize,
       centralDirectoryOffset,
     );
-    controller.enqueue(zip64EndRecord);
+    await writer.write(zip64EndRecord);
     archiveOffset += zip64EndRecord.byteLength;
 
     const zip64Locator = createZip64EndLocator(zip64EndOffset);
-    controller.enqueue(zip64Locator);
+    await writer.write(zip64Locator);
     archiveOffset += zip64Locator.byteLength;
-    controller.enqueue(createZipEndRecord(entries.length, centralDirectorySize, centralDirectoryOffset, true));
+    await writer.write(createZipEndRecord(entries.length, centralDirectorySize, centralDirectoryOffset, true));
   } else {
-    controller.enqueue(createZipEndRecord(entries.length, centralDirectorySize, centralDirectoryOffset, false));
+    await writer.write(createZipEndRecord(entries.length, centralDirectorySize, centralDirectoryOffset, false));
   }
-  controller.close();
 }
 
 function shouldUseZip64(files, textEncoder) {
@@ -421,6 +434,16 @@ function shouldUseZip64(files, textEncoder) {
   // the archive in ZIP64 when headers plus payload would reach the sentinel
   // value, even if the declared file data alone is below 4 GiB.
   return dataSize + centralDirectorySize + 22 >= ZIP32_MAX;
+}
+
+function getZip32Length(files, textEncoder) {
+  let length = 22;
+  for (const file of files) {
+    const nameSize = textEncoder.encode(file.name).byteLength;
+    length += 30 + nameSize + file.declaredSize + 16;
+    length += 46 + nameSize;
+  }
+  return length;
 }
 
 async function fetchDriveFile(file, env, init = {}) {
