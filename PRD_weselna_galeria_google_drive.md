@@ -110,11 +110,10 @@ Zapewnić gościom weselnym najkrótszą możliwą ścieżkę:
 - automatyczne ponawianie błędów przejściowych,
 - wznawianie po ponownym wybraniu tego samego pliku,
 - galeria kafelkowa,
-- zaznaczanie wielu materiałów w galerii,
 - otwieranie zdjęcia,
 - odtwarzanie filmu,
 - zapasowy podgląd Google dla formatów, których przeglądarka nie obsługuje,
-- pobieranie pojedynczego lub wielu zaznaczonych plików,
+- pobieranie pojedynczego pliku,
 - automatyczne pobieranie wszystkich elementów galerii stronami po 100 rekordów,
 - ręczne odświeżenie galerii,
 - kod QR,
@@ -150,11 +149,9 @@ Nie ma interfejsu sortowania. Porządek techniczny jest stały: najnowsze pliki 
 
 ### 5.3. Gość pobiera
 
-1. Zaznacza jeden lub więcej materiałów w galerii.
-2. Naciska „Pobierz zaznaczone”.
-3. Dla jednego zaznaczonego materiału przeglądarka pobiera bezpośrednio oryginalny plik.
-4. Dla wielu zaznaczonych materiałów przeglądarka pobiera jedno archiwum `wspolne-wspomnienia.zip`.
-5. Archiwum zawiera oryginalne pliki z zachowanymi nazwami; przy powtórzonych nazwach dodawany jest numer.
+1. Otwiera materiał.
+2. Naciska „Pobierz plik”.
+3. Otrzymuje oryginalny plik z oryginalną nazwą.
 
 ---
 
@@ -247,7 +244,7 @@ Zakres `drive.file` ogranicza szkody: token aplikacji nie powinien zapewniać do
 | FR-10 | Zdjęcie otwiera się w podglądzie. |
 | FR-11 | Film ma natywny odtwarzacz i obsługę przewijania. |
 | FR-12 | HEIC/HEVC i nieobsługiwane media mają zapasowy podgląd Google. |
-| FR-13 | Każdy materiał ma pobieranie pojedynczego oryginału; jedno zaznaczenie pobiera oryginał, a wiele zaznaczeń jedno archiwum ZIP. |
+| FR-13 | Każdy materiał ma pobieranie pojedynczego oryginału. |
 | FR-14 | Nie ma usuwania, edycji, opisu, komentarzy ani sortowania w UI. |
 | FR-15 | Endpoint health sprawdza dostęp do właściwego folderu. |
 
@@ -378,15 +375,6 @@ Podgląd/stream oryginału. Przekazuje `Range`.
 ### `GET|HEAD /api/download/:fileId?name=...&resourceKey=...`
 
 Pobieranie oryginału z `Content-Disposition: attachment`.
-
-### `POST /api/download-archive`
-
-Strumieniowe pobieranie jednego archiwum ZIP z co najmniej dwóch zaznaczonych oryginałów. Żądanie
-może być JSON-em albo formularzem `application/x-www-form-urlencoded` z polem
-`files`, zawierającym tablicę obiektów `{ id, name, size, resourceKey }`.
-Endpoint przyjmuje maksymalnie 45 plików i łączny rozmiar deklarowany do 15 GB.
-Używa ZIP64 i dodaje pliki bez kompresji, aby obsłużyć archiwa większe niż 4 GB,
-nie obciążać dodatkowo Workera i zachować oryginalną zawartość.
 
 ---
 
@@ -3108,8 +3096,7 @@ function sleep(milliseconds) {
 8. Pojawienie się pliku w galerii.
 9. Podgląd z częściowym pobraniem `Range`.
 10. Pobieranie z `Content-Disposition: attachment`.
-11. Pobranie archiwum ZIP zawierającego dwa wpisy dla zaznaczenia wieloplikowego.
-12. Usunięcie pliku testowego bez pozostawiania śmieci.
+11. Usunięcie pliku testowego bez pozostawiania śmieci.
 
 Test wymaga działającego `.dev.vars`. Po niepowodzeniu plik testowy może wymagać ręcznego usunięcia.
 
@@ -3137,7 +3124,6 @@ Agent lub właściciel ma odnotować wynik każdego wiersza.
 | iPhone Safari | MOV/HEVC | upload, odtwarzacz lub Google fallback, download |
 | Android Chrome | JPG/PNG/WebP | upload, podgląd, download |
 | Android Chrome | MP4/H.264 | upload, odtwarzanie i przewijanie |
-| iPhone Safari / Android Chrome | wiele zaznaczonych plików | jedno pobieranie archiwum ZIP zawierającego wszystkie pliki |
 | Desktop Chrome | wiele plików | kolejka działa sekwencyjnie |
 | Rozmiar | zdjęcie 5–20 MB | sukces |
 | Rozmiar | film około 200 MB | sukces i postęp |
